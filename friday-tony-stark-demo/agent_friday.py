@@ -15,6 +15,7 @@ Run:
 import logging
 import os
 import subprocess
+from datetime import datetime
 
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
@@ -128,6 +129,20 @@ Sai: "Thị trường vận hành tích cực với mức tăng trên các chỉ
 4. Bạn là một giọng nói. Hãy nói như người thật: ngắn, rõ, tự nhiên, hoàn toàn bằng tiếng Việt.
 """.strip()
 
+SYSTEM_PROMPT += """
+
+## Loi chao luc khoi dong
+
+Khi phien bat dau, hay chao theo gio he thong hien tai:
+- 05:00-10:59 -> "Chào buổi sáng, sếp."
+- 11:00-12:59 -> "Chào buổi trưa, sếp."
+- 13:00-17:59 -> "Chào buổi chiều, sếp."
+- 18:00-21:59 -> "Chào buổi tối, sếp."
+- 22:00-04:59 -> "Chào buổi đêm, sếp."
+
+17:25 vẫn được xe là "buổi chiều", không phải "buổi tối".
+""".strip()
+
 SEARCH_RULES = """
 ## Tra cứu web tự động
 
@@ -139,9 +154,43 @@ SEARCH_RULES = """
 - Nếu không tìm được dữ liệu, nói rõ ràng là thông tin tìm thấy không đáng tin cậy.
 """.strip()
 
+SEARCH_RULES += """
+
+## Weather routing
+
+- Khi nguoi dung hoi thoi tiet, du bao, mua nang, nhiet do, do am, hay gio theo dia diem,
+  uu tien goi tool `get_weather`.
+- Tool `get_weather` co the hieu ten thanh pho Viet Nam theo kieu co dau, khong dau, viet tat hoac ten quen dung.
+- Neu chua co dia diem cu the, hay hoi lai ngan gon dia diem can xem thoi tiet.
+""".strip()
+
 # ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
+
+
+def _time_of_day_label(hour: int) -> str:
+    """Return the Vietnamese time-of-day label for the startup greeting."""
+    if 5 <= hour < 11:
+        return "buổi sáng"
+    if 11 <= hour < 13:
+        return "buổi trưa"
+    if 13 <= hour < 18:
+        return "buổi chiều"
+    if 18 <= hour < 22:
+        return "buổi tối"
+    return "buổi đêm"
+
+
+def _build_startup_greeting(now=None) -> str:
+    """Build a startup greeting from the current local machine time."""
+    now = now or datetime.now()
+    time_label = _time_of_day_label(now.hour)
+    return (
+        f"Chào {time_label}, sếp. "
+        f"Bây giờ là {now.hour:02d} giờ {now.minute:02d}. "
+        "Mình xem gì cho sếp đây?"
+    )
 
 load_dotenv()
 
@@ -272,7 +321,15 @@ class FridayAgent(Agent):
         )
 
     async def on_enter(self) -> None:
-        """Greet the user specifically for the late-night lab session."""
+        """Greet the user based on the machine's current local time."""
+        greeting = _build_startup_greeting()
+        await self.session.generate_reply(
+            instructions=(
+                "Chào người dùng dùng nguyên văn câu sau, không thêm bớt ý nào khác: "
+                f"'{greeting}'"
+            )
+        )
+        return
         await self.session.generate_reply(
             instructions=(
                 "Chào người dùng đúng nguyên văn như sau: "

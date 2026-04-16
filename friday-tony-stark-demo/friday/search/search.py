@@ -39,6 +39,49 @@ def _extract_sources(response: types.GenerateContentResponse, limit: int = 5) ->
     return sources
 
 
+def _format_search_error(exc: Exception) -> str:
+    """Convert provider/network errors into short Vietnamese diagnostics."""
+    message = " ".join(str(part).strip() for part in exc.args if str(part).strip()) or str(exc).strip()
+    lower = message.lower()
+
+    if (
+        "10013" in lower
+        or "forbidden by its access permissions" in lower
+        or "socket" in lower and "forbidden" in lower
+    ):
+        return (
+            "Tôi chưa thể tìm kiếm web vì tiến trình hiện tại đang bị chặn kết nối mạng ra ngoài. "
+            "Sếp kiểm tra giúp tôi Windows Firewall, antivirus, proxy/VPN, hoặc quyền mạng của Python/uv."
+        )
+
+    if (
+        "timed out" in lower
+        or "timeout" in lower
+        or "deadline exceeded" in lower
+    ):
+        return "Tôi chưa thể tìm kiếm web vì kết nối ra ngoài đang quá chậm hoặc bị timeout."
+
+    if (
+        "getaddrinfo failed" in lower
+        or "name or service not known" in lower
+        or "temporary failure in name resolution" in lower
+        or "nodename nor servname provided" in lower
+    ):
+        return "Tôi chưa thể tìm kiếm web vì máy hiện không phân giải được DNS hoặc chưa ra internet."
+
+    if (
+        "api key" in lower
+        or "unauthenticated" in lower
+        or "permission_denied" in lower
+        or "permission denied" in lower
+        or "401" in lower
+        or "403" in lower
+    ):
+        return "Tôi chưa thể tìm kiếm web vì khóa API hoặc quyền truy cập Google Search chưa hợp lệ."
+
+    return f"Tôi chưa thể tìm kiếm web lúc này: {message}"
+
+
 def google_web_search(query: str, max_sources: int = 5) -> str:
     """
     Tìm kiếm web bằng Gemini Google Search grounding và trả về báo cáo ngắn gọn.
@@ -72,7 +115,7 @@ def google_web_search(query: str, max_sources: int = 5) -> str:
             ),
         )
     except Exception as exc:
-        return f"Tôi không thể thực hiện tìm kiếm lúc này: {exc}"
+        return _format_search_error(exc)
 
     summary = (response.text or "").strip()
     if not summary:
