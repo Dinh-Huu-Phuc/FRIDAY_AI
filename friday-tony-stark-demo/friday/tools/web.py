@@ -6,8 +6,7 @@ import httpx
 import xml.etree.ElementTree as ET
 import asyncio  # Cần thiết để thực thi song song
 import re
-from datetime import datetime
-from friday.search import google_web_search
+from friday.search import get_weather_report, google_web_search
 
 SEED_FEEDS = [
     'https://feeds.bbci.co.uk/news/world/rss.xml',
@@ -15,37 +14,6 @@ SEED_FEEDS = [
     'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
     'https://www.aljazeera.com/xml/rss/all.xml'
 ]
-
-WEATHER_CODE_TEXT = {
-    0: "trời quang",
-    1: "khá quang",
-    2: "mây rải rác",
-    3: "nhiều mây",
-    45: "sương mù",
-    48: "sương mù đóng băng",
-    51: "mưa phùn nhẹ",
-    53: "mưa phùn vừa",
-    55: "mưa phùn nặng hạt",
-    56: "mưa phùn đóng băng nhẹ",
-    57: "mưa phùn đóng băng nặng",
-    61: "mưa nhẹ",
-    63: "mưa vừa",
-    65: "mưa to",
-    66: "mưa đóng băng nhẹ",
-    67: "mưa đóng băng nặng",
-    71: "tuyết rơi nhẹ",
-    73: "tuyết rơi vừa",
-    75: "tuyết rơi dày",
-    77: "hạt tuyết",
-    80: "mưa rào nhẹ",
-    81: "mưa rào vừa",
-    82: "mưa rào mạnh",
-    85: "mưa tuyết nhẹ",
-    86: "mưa tuyết mạnh",
-    95: "dông",
-    96: "dông kèm mưa đá nhẹ",
-    99: "dông kèm mưa đá mạnh",
-}
 
 async def fetch_and_parse_feed(client, url):
     """Hàm hỗ trợ xử lý yêu cầu RSS feed và phân tích cú pháp XML."""
@@ -116,80 +84,15 @@ def register(mcp):
     @mcp.tool()
     async def search_web(query: str) -> str:
         """Tìm kiếm trên web theo yêu cầu và trả về bản tóm tắt kết quả."""
-        return google_web_search(query=query)
+        return await asyncio.to_thread(google_web_search, query=query)
 
     @mcp.tool()
     async def get_weather(city: str, country: str = "Vietnam") -> str:
         """
-        Lấy thời tiết hiện tại theo thành phố.
+        Lấy thời tiết hiện tại và dự báo ngắn hạn theo thành phố.
         Ví dụ city: "Da Lat", "Ho Chi Minh", "Ha Noi".
         """
-        city = (city or "").strip()
-        country = (country or "").strip()
-        if not city:
-            return "Bạn chưa cung cấp tên thành phố để tra cứu thời tiết."
-
-        geo_url = "https://geocoding-api.open-meteo.com/v1/search"
-        forecast_url = "https://api.open-meteo.com/v1/forecast"
-
-        try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=12) as client:
-                geo_res = await client.get(
-                    geo_url,
-                    params={
-                        "name": city,
-                        "count": 1,
-                        "language": "vi",
-                        "format": "json",
-                        "country": country,
-                    },
-                )
-                geo_res.raise_for_status()
-                geo_data = geo_res.json()
-                results = geo_data.get("results") or []
-                if not results:
-                    return f"Tôi chưa tìm thấy thành phố '{city}' để lấy thời tiết."
-
-                place = results[0]
-                lat = place.get("latitude")
-                lon = place.get("longitude")
-                city_name = place.get("name", city)
-                admin = place.get("admin1") or ""
-                country_name = place.get("country") or country
-
-                weather_res = await client.get(
-                    forecast_url,
-                    params={
-                        "latitude": lat,
-                        "longitude": lon,
-                        "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m",
-                        "timezone": "auto",
-                    },
-                )
-                weather_res.raise_for_status()
-                weather_data = weather_res.json()
-                current = weather_data.get("current") or {}
-        except Exception as exc:
-            return f"Tôi chưa lấy được dữ liệu thời tiết lúc này: {exc}"
-
-        temp = current.get("temperature_2m")
-        feels = current.get("apparent_temperature")
-        humidity = current.get("relative_humidity_2m")
-        wind = current.get("wind_speed_10m")
-        code = int(current.get("weather_code", -1))
-        status = WEATHER_CODE_TEXT.get(code, "điều kiện thời tiết chưa xác định")
-
-        location_text = city_name
-        if admin:
-            location_text += f", {admin}"
-        if country_name:
-            location_text += f", {country_name}"
-
-        return (
-            f"Thời tiết hiện tại ở {location_text}: {status}. "
-            f"Nhiệt độ {temp}°C, cảm giác như {feels}°C, độ ẩm {humidity}%, "
-            f"gió khoảng {wind} km/h."
-        )
+        return await get_weather_report(city=city, country=country)
 
     @mcp.tool()
     async def fetch_url(url: str) -> str:
