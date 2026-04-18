@@ -5,13 +5,15 @@ Google web search helper powered by Gemini + Google Search grounding.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import List, Tuple
 
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-load_dotenv()
+_ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 
 def _extract_sources(response: types.GenerateContentResponse, limit: int = 5) -> List[Tuple[str, str]]:

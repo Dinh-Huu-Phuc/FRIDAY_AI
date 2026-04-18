@@ -1,0 +1,181 @@
+Bạn hãy đóng vai kỹ sư phần mềm Python cấp cao và viết full code production-ready để bổ sung tính năng “STT Correction / Refiner” cho project trợ lý AI `friday-tony-stark-demo/friday`.
+
+Bối cảnh:
+- Đây là project Python cho trợ lý AI F.R.I.D.A.Y.
+- Hệ thống hiện đã có Agent, prompts, tools, messages, config, search...
+- Đầu vào từ micro sẽ đi qua dịch vụ STT như Deepgram hoặc Google Speech-to-Text.
+- Văn bản STT trả về thường có lỗi chính tả, thiếu dấu, sai tên riêng, sai ngữ cảnh hoặc nghe nhầm lệnh.
+- Tôi muốn thêm một lớp “tinh chỉnh văn bản STT” trước khi đưa câu đó vào Agent để tăng độ chính xác.
+
+Mục tiêu chính:
+- Thêm một module mới trong `friday/refiner/` để sửa lỗi câu STT trước khi Agent xử lý.
+- Ưu tiên dùng Groq API vì tốc độ nhanh.
+- Thiết kế phải cho phép fallback hoặc dễ mở rộng sang OpenAI sau này.
+- Hệ thống phải giữ nguyên ý nghĩa câu nói của người dùng, chỉ sửa lỗi nhận dạng, lỗi chính tả, lỗi thiếu dấu, lỗi tên riêng, lỗi ngữ cảnh nói chuyện với trợ lý.
+- Không biến câu nói thành văn phong khác hẳn.
+- Không trả lời thay người dùng. Chỉ tinh chỉnh câu input.
+
+Cấu trúc mong muốn cần được tạo và tích hợp:
+- `friday/refiner/__init__.py`
+- `friday/refiner/stt_corrector.py`
+- `friday/refiner/custom_vocab.py`
+- cập nhật `friday/prompts/templates.py`
+- cập nhật `friday/agent_friday.py`
+- cập nhật `friday/config.py`
+- nếu cần, cập nhật `.env.example`
+
+Kiến trúc mong muốn:
+1. `refiner/custom_vocab.py`
+   - Chứa danh sách từ chuyên biệt, tên riêng, từ dễ nghe nhầm.
+   - Ví dụ:
+     - Friday
+     - F.R.I.D.A.Y.
+     - Jarvis
+     - Tony Stark
+     - Smart Home
+     - tên phòng, tên thiết bị, tên người thân, lệnh nội bộ
+   - Hỗ trợ:
+     - danh sách từ khóa
+     - alias map
+     - hàm lấy context vocabulary dưới dạng text để chèn vào prompt
+     - hàm normalize đơn giản nếu cần
+
+2. `refiner/stt_corrector.py`
+   - Viết class rõ ràng, ví dụ `STTCorrector`
+   - Chức năng:
+     - nhận raw transcript từ STT
+     - nhận thêm context nếu có: user language, conversation hints, custom vocab
+     - gọi Groq để sửa câu
+     - chỉ trả về câu đã được tinh chỉnh
+   - Có provider abstraction gọn gàng để sau này đổi sang OpenAI dễ dàng
+   - Có timeout, xử lý lỗi, fallback an toàn
+   - Nếu API lỗi, trả về câu gốc hoặc câu đã normalize nhẹ, không làm vỡ luồng hệ thống
+   - Có thể thêm rule-based preprocessing trước khi gửi AI
+   - Có post-processing để loại bỏ dấu ngoặc kép thừa, lời giải thích thừa, markdown thừa
+   - Không được để model trả về phân tích dài dòng, chỉ lấy câu đã sửa
+
+3. `friday/prompts/templates.py`
+   - Thêm prompt mẫu cho STT correction, ví dụ `STT_REFINER_PROMPT`
+   - Prompt phải đủ mạnh để model hiểu:
+     - đây là văn bản từ speech-to-text
+     - có thể sai chính tả, thiếu dấu, sai dấu, sai ngữ cảnh
+     - nhiệm vụ là sửa lại cho đúng
+     - giữ nguyên ý định người dùng
+     - không trả lời câu hỏi
+     - không thêm thông tin ngoài câu gốc
+     - ưu tiên ngữ cảnh trợ lý ảo tiếng Việt
+     - ưu tiên đúng các từ trong custom vocab
+   - Prompt phải tối ưu cho tiếng Việt tự nhiên
+
+4. `friday/config.py`
+   - Bổ sung config để đọc:
+     - `GROQ_API_KEY`
+     - `GROQ_MODEL`
+     - `OPENAI_API_KEY` nếu cần dự phòng
+     - `STT_REFINER_ENABLED`
+     - `STT_REFINER_PROVIDER`
+     - `STT_REFINER_TIMEOUT`
+   - Nếu project đang có pattern config sẵn thì bám theo pattern đó
+   - Không phá logic cũ
+
+5. `friday/agent_friday.py`
+   - Tích hợp refiner vào luồng xử lý:
+     - Mic / STT engine -> raw text
+     - raw text -> refiner
+     - refined text -> agent logic hiện tại
+   - Chỉ thêm vào đúng chỗ cần thiết
+   - Không rewrite toàn bộ agent nếu không cần
+   - Nếu refiner tắt bằng config thì hệ thống vẫn chạy bình thường với raw text
+   - Có logging ngắn gọn:
+     - raw transcript
+     - refined transcript
+     - trạng thái dùng provider nào
+     - fallback nếu lỗi
+   - Không log lộ key hoặc dữ liệu nhạy cảm quá mức
+
+Yêu cầu về hành vi của STT Corrector:
+- Input ví dụ:
+  - “moi den phong khach”
+  - “bat quat phong ngu”
+  - “fridai hom nay thoi tiet sao”
+  - “goi cho me toi”
+  - “tat smart hom”
+- Output mong muốn:
+  - “Mở đèn phòng khách”
+  - “Bật quạt phòng ngủ”
+  - “Friday, hôm nay thời tiết sao?”
+  - “Gọi cho mẹ tôi”
+  - “Tắt Smart Home”
+- Phải xử lý tốt:
+  - tiếng Việt không dấu
+  - tên riêng tiếng Anh chèn trong câu tiếng Việt
+  - lỗi sai do STT nghe nhầm
+  - câu ngắn kiểu mệnh lệnh
+  - văn bản tự nhiên kiểu hội thoại
+- Nếu không chắc, ưu tiên giữ gần nghĩa câu gốc, không bịa
+
+Yêu cầu kỹ thuật:
+- Viết code sạch, có type hints, docstring, xử lý lỗi cơ bản
+- Ưu tiên Python standard library; nếu cần thư viện ngoài thì hạn chế tối đa
+- Nếu dùng SDK cho Groq/OpenAI thì ghi rõ import cần thiết
+- Không dùng placeholder kiểu `pass`, `TODO`, “tự cài sau”
+- Phải viết code chạy được ở mức hoàn chỉnh
+- Không mô tả lý thuyết dài dòng; tập trung vào code thật
+- Nếu cần helper function thì tạo rõ ràng
+- Nếu cần dataclass hoặc schema nhẹ thì dùng hợp lý
+- Không phá vỡ cấu trúc project cũ
+
+Yêu cầu về output của bạn:
+1. Trước tiên, in ra cây thư mục cập nhật sau khi thêm `refiner/`.
+2. Sau đó viết full code cho từng file theo thứ tự:
+   - `friday/refiner/__init__.py`
+   - `friday/refiner/custom_vocab.py`
+   - `friday/refiner/stt_corrector.py`
+   - phần cập nhật trong `friday/prompts/templates.py`
+   - phần cập nhật trong `friday/config.py`
+   - phần cập nhật trong `friday/agent_friday.py`
+   - phần cập nhật trong `.env.example` nếu cần
+3. Mỗi file phải có tiêu đề rõ ràng kiểu:
+   - `# friday/refiner/stt_corrector.py`
+4. Không được bỏ sót import
+5. Không rút gọn code
+6. Phải có ví dụ cách sử dụng class `STTCorrector`
+7. Phải có ít nhất 5 ví dụ input/output cho STT correction
+8. Nếu project hiện có pattern đặt tên hoặc style code rõ ràng, hãy giữ càng gần càng tốt
+9. Tất cả phần giải thích và comment nên ngắn gọn, thực dụng
+
+Yêu cầu thiết kế prompt cho model sửa STT:
+- Prompt phải ép model:
+  - chỉ xuất ra duy nhất câu đã chỉnh sửa
+  - không giải thích
+  - không thêm dấu ngoặc kép
+  - không thêm lời dẫn như “Câu đúng là...”
+  - không trả lời nội dung của câu
+- Prompt phải tận dụng custom vocab như một nguồn ưu tiên nhận diện
+- Prompt phải phù hợp với câu lệnh ngắn kiểu điều khiển nhà thông minh lẫn hội thoại thường ngày
+
+Yêu cầu fallback:
+- Nếu API Groq lỗi, timeout, hoặc trả về rỗng:
+  - fallback sang xử lý tối thiểu bằng rule-based
+  - hoặc trả về raw transcript đã normalize
+- Không được làm crash agent
+- Có log cảnh báo ngắn gọn
+
+Yêu cầu logging:
+- Viết logging vừa đủ để debug
+- Không in API key
+- Không in stack trace dài trừ khi ở chế độ debug
+- Có thể tái sử dụng logger hiện tại của project nếu đã có
+
+Ràng buộc quan trọng:
+- Không biến refiner thành một chatbot trả lời người dùng
+- Refiner chỉ là tầng sửa transcript
+- Không thay đổi logic nghiệp vụ chính của agent ngoài việc chèn thêm bước refiner
+- Không được tự ý viết lại toàn bộ kiến trúc project
+- Nếu phải giả định một vài hàm đang có sẵn trong project, hãy ghi giả định đó rất ngắn gọn và vẫn cung cấp code tương thích tốt nhất
+
+Hãy trả lời bằng tiếng Việt.
+Hãy bắt đầu ngay bằng cây thư mục cập nhật, sau đó viết toàn bộ code đầy đủ cho từng file.
+
+
+Không bỏ placeholder. Không rút gọn. trực tiếp code trong dự án nha
