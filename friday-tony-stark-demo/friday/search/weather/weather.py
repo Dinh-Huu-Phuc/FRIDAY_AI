@@ -6,7 +6,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+<<<<<<< HEAD
 from pathlib import Path
+=======
+>>>>>>> a82bc93a1a54ba13cc8984b14679fdadbeeba01a
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -14,8 +17,12 @@ import httpx
 from dotenv import load_dotenv
 from .city_name import resolve_vietnam_city
 
+<<<<<<< HEAD
 _ENV_PATH = Path(__file__).resolve().parent.parent.parent.parent / ".env"
 load_dotenv(dotenv_path=_ENV_PATH, override=True)
+=======
+load_dotenv()
+>>>>>>> a82bc93a1a54ba13cc8984b14679fdadbeeba01a
 
 GEOCODE_URL = "https://api.openweathermap.org/geo/1.0/direct"
 CURRENT_WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
