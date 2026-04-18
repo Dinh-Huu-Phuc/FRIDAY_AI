@@ -1,0 +1,14 @@
+# Ignore all storage subdirectories
+archived/
+candidates/
+checkpoints/
+cleaned/
+curated/
+datasets/
+memory_store/
+raw_logs/
+reports/
+versions/
+
+# Keep this rule file
+!.gitignore

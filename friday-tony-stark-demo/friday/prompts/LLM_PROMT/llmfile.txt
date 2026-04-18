@@ -1,0 +1,74 @@
+Bạn hãy đóng vai kỹ sư Python/LLM cấp cao và cập nhật project F.R.I.D.A.Y. để agent có thể đọc và dùng file nguyên tắc thiết kế LLM từ file Markdown nội bộ.
+
+Bối cảnh:
+- Tôi đã tự tạo file `llm_design_principles.md` trong thư mục `friday/prompts/`.
+- Mục tiêu là để agent nạp các nguyên tắc này vào system prompt lúc runtime.
+- Tôi không muốn chỉ lưu tài liệu cho người đọc; tôi muốn agent thật sự dùng nội dung đó khi chạy.
+- Không được phá vỡ logic cũ của project nếu không cần.
+
+Mục tiêu cần làm:
+1. Đọc nội dung từ file:
+   - `friday/prompts/llm_design_principles.md`
+2. Tạo hàm hoặc cơ chế trong code để load nội dung file này an toàn.
+3. Ghép nội dung đó vào system prompt của agent F.R.I.D.A.Y.
+4. Nếu file không tồn tại hoặc lỗi đọc file:
+   - không được làm crash hệ thống
+   - phải fallback an toàn về chuỗi rỗng hoặc default principles ngắn
+5. Phải giữ code sạch, dễ mở rộng, dùng được ngay.
+
+Yêu cầu triển khai:
+- Ưu tiên cập nhật các file liên quan như:
+  - `friday/prompts/templates.py`
+  - `friday/messages/promt_agent_friday.py`
+  - `friday/agent_friday.py`
+  - `friday/prompts/__init__.py` nếu cần
+- Nếu project đang có nơi build system prompt riêng, hãy tích hợp đúng chỗ đó thay vì viết lại cả kiến trúc.
+- Nếu có thể, tách logic load file thành một hàm rõ ràng, ví dụ:
+  - `load_llm_design_principles()`
+  - `get_llm_design_principles_text()`
+- Nếu cần, tạo thêm constant fallback trong `templates.py`.
+
+Yêu cầu hành vi:
+- Agent phải dùng nội dung trong `llm_design_principles.md` như một phần của hướng dẫn nội bộ.
+- Nội dung principles phải được chèn vào system prompt theo một section riêng, ví dụ:
+  - `## Nguyên tắc vận hành nội bộ`
+- Không được làm prompt bị rối hoặc lặp nội dung vô ích.
+- Không hardcode toàn bộ principles trong nhiều chỗ khác nhau nếu đã có file markdown.
+- Nếu đã đọc từ file rồi thì chỉ nên có 1 nơi quản lý logic đọc file.
+
+Yêu cầu kỹ thuật:
+- Viết bằng Python.
+- Có type hints nếu hợp lý.
+- Có xử lý lỗi file not found, unicode, empty file.
+- Nếu file rỗng thì fallback an toàn.
+- Ưu tiên standard library.
+- Không dùng placeholder kiểu `pass`, `TODO`, hoặc “tự cài sau”.
+- Code phải chạy được ở mức hoàn chỉnh.
+- Không rút gọn code.
+- Không chỉ mô tả ý tưởng; phải viết code thật.
+
+Yêu cầu output:
+1. In ra ngắn gọn cây file nào sẽ cập nhật.
+2. Viết full code cho từng file được sửa theo thứ tự.
+3. Mỗi file phải có tiêu đề rõ ràng, ví dụ:
+   - `# friday/prompts/templates.py`
+4. Nếu chỉ sửa một phần file, hãy vẫn viết ra phiên bản hoàn chỉnh dễ copy.
+5. Thêm ví dụ ngắn cách system prompt sau khi ghép principles sẽ trông như thế nào.
+6. Thêm ghi chú ngắn cuối cùng:
+   - file nào chịu trách nhiệm load principles
+   - file nào chịu trách nhiệm ghép vào system prompt
+   - fallback hoạt động ra sao
+
+Ràng buộc quan trọng:
+- Không được làm crash agent nếu thiếu file markdown.
+- Không được viết lại toàn bộ project.
+- Chỉ bổ sung đúng phần cần thiết để agent đọc được file principles lúc runtime.
+- Giữ tương thích tối đa với cấu trúc project hiện có.
+- Giả định file principles nằm đúng ở:
+  - `friday/prompts/llm_design_principles.md`
+
+Hãy trả lời bằng tiếng Việt.
+Hãy bắt đầu bằng cây file cập nhật, sau đó viết toàn bộ code đầy đủ cho từng file.
+Không rút gọn code. Không bỏ placeholder. 
+
+Nếu trong project đang có thư mục `prompts` thì dùng đúng `friday/prompts/llm_design_principles.md`. Không tự đổi sang tên thư mục khác.

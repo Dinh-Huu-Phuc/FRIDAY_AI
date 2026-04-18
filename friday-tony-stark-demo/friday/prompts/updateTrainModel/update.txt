@@ -1,0 +1,309 @@
+Bạn hãy đóng vai kiến trúc sư AI/Python cấp cao và thiết kế + viết full code production-ready để cải tiến project trợ lý AI F.R.I.D.A.Y. theo hướng học dài hạn an toàn.
+
+Mục tiêu cốt lõi:
+- KHÔNG train model sau mỗi lượt chat.
+- MỖI lượt hội thoại phù hợp phải được chuyển thành dữ liệu có cấu trúc, lưu vào kho dataset trung gian.
+- Dataset này sẽ được làm sạch, lọc an toàn, chấm điểm, version hóa và chỉ dùng để train theo lô vào thời điểm riêng.
+- Memory thời gian thực phục vụ inference phải tách biệt hoàn toàn với training pipeline.
+
+Bối cảnh:
+- Project Python hiện có cấu trúc kiểu:
+  - friday/messages/
+  - friday/prompts/
+  - friday/search/
+  - friday/tools/
+  - friday/log/
+  - friday/config.py
+  - friday/agent_friday.py
+- Tôi muốn cải tiến kiến trúc để Friday:
+  - hiểu ngữ cảnh tốt hơn
+  - cá nhân hóa tốt hơn
+  - ổn định hơn
+  - có thể tích lũy dữ liệu hội thoại thành dataset chất lượng để train sau
+- Không được phá logic cũ nếu không cần.
+
+Triết lý bắt buộc:
+1. Không giả định model tự hiểu như con người.
+2. Mọi lượt chat không được tự train ngay.
+3. Hội thoại phải được lưu thành dữ liệu có cấu trúc để tạo dataset về sau.
+4. Memory chỉ phục vụ suy luận thời gian thực, không thay cho training.
+5. Chỉ dữ liệu sạch, an toàn, đủ chất lượng mới được đi vào dataset train.
+6. Model mới phải được evaluate trước khi promote.
+7. Luôn có versioning, report và rollback.
+
+Kiến trúc bắt buộc phải có 4 lớp:
+
+A. Input Refinement
+- Tạo lớp xử lý đầu vào để giảm mơ hồ trước khi đưa vào agent.
+- Nếu input đến từ STT hoặc text bẩn thì cần:
+  - chuẩn hóa văn bản
+  - sửa lỗi phổ biến
+  - thêm dấu tiếng Việt khi phù hợp
+  - sửa tên riêng/từ chuyên biệt bằng custom vocab
+- Nếu dùng LLM để refine:
+  - chỉ trả về câu đã chỉnh sửa
+  - không giải thích
+  - không thêm ý
+  - có fallback an toàn nếu lỗi
+
+B. Runtime Memory
+- Tạo memory thời gian thực cho inference.
+- Bao gồm:
+  - short-term memory theo session
+  - long-term memory theo user
+- Lưu được:
+  - cách xưng hô
+  - ngôn ngữ ưu tiên
+  - độ dài câu trả lời mong muốn
+  - tên gọi ưa thích
+  - sở thích hoặc chủ đề lặp lại
+- Có manager để load trước khi gọi model và update sau mỗi phản hồi.
+- Tuyệt đối không dùng memory này để sửa trọng số model ngay.
+
+C. Conversation-to-Dataset Pipeline
+- Đây là phần bắt buộc quan trọng nhất.
+- Mỗi lượt hội thoại phải đi qua luồng:
+  1. thu log hội thoại
+  2. chuẩn hóa schema
+  3. làm sạch
+  4. mask dữ liệu nhạy cảm
+  5. safety filter
+  6. chấm điểm chất lượng
+  7. chuyển thành candidate dataset example
+  8. lưu vào kho dataset trung gian
+  9. gom lô để tạo train/valid/test khi đủ điều kiện
+- Không train ngay sau bước 8.
+- Phải có cơ chế tích lũy dữ liệu và train sau theo:
+  - lịch định kỳ
+  - số lượng mẫu tối thiểu
+  - hoặc trigger thủ công
+- Phải tách rõ:
+  - raw conversation logs
+  - cleaned records
+  - candidate dataset
+  - curated dataset ready for training
+  - archived datasets
+- Mỗi sample cần có metadata tối thiểu:
+  - session_id
+  - user_id nếu có
+  - timestamp
+  - user_message
+  - assistant_message
+  - source
+  - refined_input nếu có
+  - feedback_score nếu có
+  - resolved nếu có
+  - safety_status
+  - quality_score
+  - dataset_status
+- Phải có schema cho training example, ví dụ:
+  - system
+  - instruction
+  - output
+  - metadata
+- Phải có version hóa dataset:
+  - dataset_v1
+  - dataset_v2
+  - ...
+- Phải có report cho từng lần build dataset:
+  - tổng số hội thoại
+  - số bị loại
+  - số được giữ
+  - lý do loại
+  - tỷ lệ train/valid/test
+  - ngày tạo
+- Chỉ dataset curated mới được đưa vào trainer.
+
+D. Batch Training + Evaluation + Versioning
+- Tạo module trainModel riêng.
+- Bao gồm tối thiểu:
+  - collector
+  - cleaner
+  - safety_filter
+  - scorer
+  - dataset_builder
+  - trainer
+  - evaluator
+  - versioning
+  - pipeline
+- Trainer hiện tại chưa cần fine-tune thật nếu project chưa có backend train, nhưng interface phải hoàn chỉnh để sau này nối vào:
+  - local SFT
+  - LoRA
+  - external training service
+- Evaluator phải so sánh candidate model với current model trước khi promote.
+- Versioning phải quản lý:
+  - model versions
+  - dataset versions
+  - reports
+  - active/archived
+  - rollback
+
+Yêu cầu chức năng chi tiết:
+
+1. Collector
+- Đọc log hội thoại từ thư mục log hiện tại.
+- Hỗ trợ JSON và JSONL.
+- Chuẩn hóa dữ liệu thành schema conversation sample.
+- Ghi raw samples vào storage.
+
+2. Cleaner
+- Chuẩn hóa text.
+- Bỏ khoảng trắng thừa, làm sạch xuống dòng.
+- Mask email, số điện thoại, ID đơn giản, token/secret.
+- Giữ nguyên ý nghĩa.
+
+3. Safety Filter
+- Loại bỏ dữ liệu không được học:
+  - traceback
+  - error message
+  - refusal response
+  - spam
+  - text lặp vô nghĩa
+  - dữ liệu quá nhạy cảm
+- Trả về:
+  - safe/unsafe
+  - reason
+  - severity
+
+4. Scorer
+- Chấm điểm chất lượng từng sample từ 0.0 đến 1.0.
+- Dựa vào:
+  - độ rõ của user message
+  - độ đầy đủ của assistant message
+  - feedback_score nếu có
+  - resolved nếu có
+  - dấu hiệu generic, lỗi, lặp
+- Có ngưỡng keep/drop.
+
+5. Dataset Builder
+- Chuyển sample đạt chuẩn thành training examples.
+- Xuất JSONL.
+- Hỗ trợ train/valid/test split ổn định bằng seed.
+- Có version cho dataset.
+- Có manifest metadata cho dataset.
+- Có cờ trạng thái cho sample:
+  - raw
+  - cleaned
+  - rejected
+  - candidate
+  - curated
+  - archived
+
+6. Trainer
+- Không train sau mỗi chat.
+- Chỉ nhận curated dataset version.
+- Tạo checkpoint folder.
+- Tạo training report.
+- Lưu metadata run.
+- Thiết kế dễ nối backend train thật.
+
+7. Evaluator
+- So sánh candidate model với active model.
+- Trả ra:
+  - candidate_score
+  - current_score
+  - improvement
+  - regression checks
+  - promote_recommended
+  - reasons
+
+8. Versioning
+- Quản lý đồng thời:
+  - dataset versions
+  - model versions
+- Có:
+  - create_dataset_version
+  - list_dataset_versions
+  - get_latest_dataset
+  - archive_dataset
+  - create_model_version
+  - get_active_model
+  - promote_model
+  - rollback_model
+
+9. Memory
+- Tách riêng thư mục memory/ cho runtime inference.
+- Không dùng memory để train ngay.
+- Có extractor rule-based để rút preference từ hội thoại.
+- Có manager để nạp đúng context liên quan nhất.
+
+10. Agent Integration
+- Tích hợp vào luồng agent như sau:
+  - input thô
+  - refiner
+  - memory load
+  - agent response
+  - memory update
+  - conversation logger
+  - conversation-to-dataset enqueue/store
+- Bước cuối chỉ lưu dữ liệu vào pipeline, không train ngay.
+
+Yêu cầu về cấu trúc thư mục:
+- Hãy đề xuất cây thư mục hoàn chỉnh cho:
+  - friday/refiner/
+  - friday/trainModel/
+  - friday/trainModel/memory/
+  - friday/trainModel/storage/
+- Trong storage phải có thư mục tách rõ:
+  - raw_logs/
+  - cleaned/
+  - candidates/
+  - curated/
+  - datasets/
+  - checkpoints/
+  - reports/
+  - versions/
+  - memory_store/
+
+Yêu cầu về code:
+- Viết bằng Python.
+- Có type hints, docstring, xử lý lỗi cơ bản.
+- Ưu tiên standard library.
+- Nếu cần thư viện ngoài thì hạn chế tối đa và nêu rõ.
+- Không dùng placeholder như pass, TODO, hoặc “tự cài sau”.
+- Code phải chạy được ở mức khung hoàn chỉnh.
+- Không được chỉ mô tả ý tưởng; phải viết code thật cho từng file.
+- Giữ tương thích tối đa với project hiện có.
+
+Yêu cầu về output:
+1. In ra cây thư mục hoàn chỉnh sau cải tiến.
+2. Sau đó viết full code cho từng file theo thứ tự.
+3. Mỗi file phải có tiêu đề rõ ràng, ví dụ:
+   - # friday/trainModel/config.py
+4. Phải có đầy đủ code cho:
+   - refiner
+   - memory
+   - conversation logging to dataset
+   - collector
+   - cleaner
+   - safety_filter
+   - scorer
+   - dataset_builder
+   - trainer
+   - evaluator
+   - versioning
+   - pipeline
+   - phần cập nhật agent_friday.py
+   - phần cập nhật config.py
+5. Phải có ví dụ:
+   - mẫu log hội thoại đầu vào
+   - mẫu candidate dataset record
+   - mẫu curated training example
+   - cách gọi run_training_pipeline()
+   - cách agent lưu hội thoại vào dataset store mà không train ngay
+6. Phải có ghi chú cuối cùng rất ngắn:
+   - file nào chịu trách nhiệm gì
+   - inference dùng gì
+   - training dùng gì
+   - vì sao kiến trúc này tốt hơn train sau mỗi lượt chat
+
+Ràng buộc rất quan trọng:
+- Không tự train model sau mỗi hội thoại.
+- Phải biến hội thoại thành dataset trung gian để tích lũy.
+- Chỉ train khi dataset đủ điều kiện hoặc được trigger batch.
+- Memory và training pipeline phải tách biệt.
+- Hệ thống phải ổn định, rollback được, dễ kiểm soát.
+
+Hãy trả lời bằng tiếng Việt.
+Hãy bắt đầu ngay bằng cây thư mục đầy đủ, sau đó viết toàn bộ code theo thứ tự file.
+Không rút gọn code. Không bỏ placeholder. Tôi cần bản có thể copy từng file để ghép thẳng vào project.

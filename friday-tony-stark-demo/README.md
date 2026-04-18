@@ -142,7 +142,7 @@ Copy `.env.example` → `.env` and fill in the values below.
 Open `agent_friday.py` and change the provider constants at the top:
 
 ```python
-STT_PROVIDER = "sarvam"   # "sarvam" | "whisper"
+STT_PROVIDER = "google"   # "google" | "deepgram" | "sarvam" | "whisper"
 LLM_PROVIDER = "gemini"   # "gemini" | "openai"
 TTS_PROVIDER = "openai"   # "openai" | "sarvam"
 ```
