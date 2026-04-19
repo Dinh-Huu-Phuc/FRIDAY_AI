@@ -6,23 +6,17 @@ from __future__ import annotations
 
 import asyncio
 import os
-<<<<<<< HEAD
-from pathlib import Path
-=======
->>>>>>> a82bc93a1a54ba13cc8984b14679fdadbeeba01a
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
 from dotenv import load_dotenv
+
 from .city_name import resolve_vietnam_city
 
-<<<<<<< HEAD
 _ENV_PATH = Path(__file__).resolve().parent.parent.parent.parent / ".env"
 load_dotenv(dotenv_path=_ENV_PATH, override=True)
-=======
-load_dotenv()
->>>>>>> a82bc93a1a54ba13cc8984b14679fdadbeeba01a
 
 GEOCODE_URL = "https://api.openweathermap.org/geo/1.0/direct"
 CURRENT_WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
@@ -36,13 +30,13 @@ def _get_api_key() -> str:
     )
 
 
+def _normalize_text(value: str) -> str:
+    return (value or "").strip().casefold()
+
+
 def _is_vietnam_country(country: str) -> bool:
     normalized = _normalize_text(country)
     return normalized in {"", "vn", "vietnam", "viet nam"}
-
-
-def _normalize_text(value: str) -> str:
-    return (value or "").strip().casefold()
 
 
 def _pick_best_location(results: list[dict[str, Any]], city: str, country: str) -> dict[str, Any]:
@@ -57,7 +51,7 @@ def _pick_best_location(results: list[dict[str, Any]], city: str, country: str) 
         state = _normalize_text(str(item.get("state", "")))
         country_code = _normalize_text(str(item.get("country", "")))
         local_names = item.get("local_names") or {}
-        aliases = [_normalize_text(str(v)) for v in local_names.values()]
+        aliases = [_normalize_text(str(value)) for value in local_names.values()]
 
         city_score = 0
         if wanted_city and (name == wanted_city or wanted_city in aliases):
@@ -121,7 +115,7 @@ def _build_forecast_summary(forecast_items: list[dict[str, Any]], timezone_offse
         snippets.append(
             f"{_to_local_time(int(item.get('dt', 0)), timezone_offset_seconds)}: "
             f"{weather.get('description', 'thời tiết chưa rõ')}, "
-            f"{_format_number(main.get('temp'))}°C{rain_text}"
+            f"{_format_number(main.get('temp'))} độ C{rain_text}"
         )
 
     return "; ".join(snippets)
@@ -132,40 +126,46 @@ def _format_weather_error(exc: Exception) -> str:
     lower = message.lower()
 
     if "401" in lower or "403" in lower or "invalid api key" in lower:
-        return "Tôi chưa thể tra thời tiết vì WEATHERMAP_API_KEY hiện không hợp lệ hoặc chưa được cấp quyền."
+        return "Tôi chưa thể trả thời tiết vì WEATHERMAP_API_KEY hiện không hợp lệ hoặc chưa được cấp quyền."
 
     if "timed out" in lower or "timeout" in lower:
-        return "Tôi chưa thể tra thời tiết vì kết nối tới dịch vụ thời tiết đang bị timeout."
+        return "Tôi chưa thể trả thời tiết vì kết nối tới dịch vụ thời tiết đang bị timeout."
 
     if (
         "10013" in lower
         or "forbidden by its access permissions" in lower
-        or "socket" in lower and "forbidden" in lower
+        or ("socket" in lower and "forbidden" in lower)
     ):
-        return "Tôi chưa thể tra thời tiết vì tiến trình hiện tại đang bị chặn kết nối mạng ra ngoài."
+        return "Tôi chưa thể trả thời tiết vì tiến trình hiện tại đang bị chặn kết nối mạng ra ngoài."
 
     if (
         "getaddrinfo failed" in lower
         or "temporary failure in name resolution" in lower
         or "name or service not known" in lower
     ):
-        return "Tôi chưa thể tra thời tiết vì máy hiện không phân giải được DNS hoặc chưa ra internet."
+        return "Tôi chưa thể trả thời tiết vì máy hiện tại không phân giải được DNS hoặc chưa ra internet."
 
     return f"Tôi chưa lấy được dữ liệu thời tiết lúc này: {message}"
 
 
-async def get_weather_report(city: str, country: str = "Vietnam") -> str:
-    """
-    Fetch current weather and short-term forecast using OpenWeatherMap.
-    """
+async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str, Any]:
+    """Fetch structured current weather and short-term forecast data."""
     city = (city or "").strip()
     country = (country or "").strip()
     if not city:
-        return "Bạn chưa cung cấp tên thành phố để tra cứu thời tiết."
+        return {
+            "ok": False,
+            "location_text": "",
+            "message": "Bạn chưa cung cấp tên thành phố để tra cứu thời tiết.",
+        }
 
     api_key = _get_api_key()
     if not api_key:
-        return "Thiếu WEATHERMAP_API_KEY trong tệp .env nên tôi chưa thể tra thời tiết."
+        return {
+            "ok": False,
+            "location_text": f"{city}, {country}" if country else city,
+            "message": "Thiếu WEATHERMAP_API_KEY trong tệp .env nên tôi chưa thể trả thời tiết.",
+        }
 
     query = city if not country else f"{city},{country}"
     place: dict[str, Any] | None = None
@@ -202,13 +202,25 @@ async def get_weather_report(city: str, country: str = "Vietnam") -> str:
                     geo_results = geo_response.json() or []
 
                 if not geo_results:
-                    return f"Tôi chưa tìm thấy địa điểm '{city}' để tra thời tiết."
+                    return {
+                        "ok": False,
+                        "location_text": f"{city}, {country}" if country else city,
+                        "message": f"Tôi chưa tìm thấy địa điểm '{city}' để trả thời tiết.",
+                    }
 
                 geocoded_place = _pick_best_location(geo_results, city=city, country=country)
                 lat = geocoded_place.get("lat")
                 lon = geocoded_place.get("lon")
                 if lat is None or lon is None:
-                    return f"Tôi đã tìm thấy '{city}' nhưng chưa lấy được toạ độ để tra thời tiết."
+                    return {
+                        "ok": False,
+                        "location_text": _format_location(
+                            geocoded_place,
+                            fallback_city=city,
+                            fallback_country=country,
+                        ),
+                        "message": f"Tôi đã tìm thấy '{city}' nhưng chưa lấy được tọa độ để trả thời tiết.",
+                    }
 
                 place = geocoded_place
 
@@ -237,7 +249,11 @@ async def get_weather_report(city: str, country: str = "Vietnam") -> str:
             current_response.raise_for_status()
             forecast_response.raise_for_status()
     except Exception as exc:
-        return _format_weather_error(exc)
+        return {
+            "ok": False,
+            "location_text": _format_location(place or {}, fallback_city=city, fallback_country=country),
+            "message": _format_weather_error(exc),
+        }
 
     current_data = current_response.json() or {}
     forecast_data = forecast_response.json() or {}
@@ -253,12 +269,29 @@ async def get_weather_report(city: str, country: str = "Vietnam") -> str:
     humidity = _format_number(current_main.get("humidity"), digits=0)
     wind_kmh = _format_number(float(current_wind.get("speed", 0)) * 3.6)
     description = current_weather.get("description", "thời tiết chưa xác định")
-
     forecast_items = forecast_data.get("list") or []
     forecast_summary = _build_forecast_summary(forecast_items, timezone_offset)
 
-    return (
-        f"Thời tiết hiện tại ở {location_text}: {description}, {temp}°C, "
-        f"cảm giác như {feels_like}°C, độ ẩm {humidity}%, gió khoảng {wind_kmh} km/h. "
-        f"Dự báo 9 giờ tới: {forecast_summary}."
-    )
+    return {
+        "ok": True,
+        "location_text": location_text,
+        "description": description,
+        "temp": temp,
+        "feels_like": feels_like,
+        "humidity": humidity,
+        "wind_kmh": wind_kmh,
+        "forecast_summary": forecast_summary,
+        "message": (
+            f"Thời tiết hiện tại ở {location_text}: {description}, {temp} độ C, "
+            f"cảm giác như {feels_like} độ C, độ ẩm {humidity}%, gió khoảng {wind_kmh} km/h. "
+            f"Dự báo 9 giờ tới: {forecast_summary}."
+        ),
+    }
+
+
+async def get_weather_report(city: str, country: str = "Vietnam") -> str:
+    """
+    Fetch current weather and short-term forecast using OpenWeatherMap.
+    """
+    snapshot = await get_weather_snapshot(city=city, country=country)
+    return str(snapshot.get("message") or "").strip()

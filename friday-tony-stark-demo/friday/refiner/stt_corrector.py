@@ -85,7 +85,7 @@ def _call_openai_compatible_chat(
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "Ban la bo sua transcript STT."},
+            {"role": "system", "content": "Bạn là bộ sửa transcript STT."},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0,
@@ -291,10 +291,10 @@ class STTCorrector:
             return ""
 
         replacements = {
-            r"(?i)\bmoi\b": "Mo",
-            r"(?i)\bgoi\b": "Goi",
-            r"(?i)\bbat\b": "Bat",
-            r"(?i)\btat\b": "Tat",
+            r"(?i)\bmở\b": "Mở",
+            r"(?i)\bgọi\b": "Gọi",
+            r"(?i)\bbật\b": "Bật",
+            r"(?i)\btắt\b": "Tắt",
             r"(?i)\bfriday\b": "Friday",
         }
         for pattern, value in replacements.items():
@@ -317,23 +317,23 @@ class STTCorrector:
         sample = str(text or "").strip().lower()
         if not sample:
             return True
-        return sample.startswith("xin chao") or sample.startswith("toi la") or sample.startswith("chac chan")
+        return sample.startswith("xin chào") or sample.startswith("tôi là") or sample.startswith("chắc chắn")
 
     @staticmethod
     def usage_example() -> str:
         return (
             "from friday.refiner import STTCorrector\n\n"
             "corrector = STTCorrector(enabled=True, provider_name='groq', groq_api_key='...')\n"
-            "result = corrector.correct('fridai hom nay thoi tiet sao', language='vi-VN')\n"
+            "result = corrector.correct('fridai hôm nay thời tiết sao', language='vi-VN')\n"
             "print(result.refined_text)"
         )
 
     @staticmethod
     def sample_input_output_examples() -> list[tuple[str, str]]:
         return [
-            ("moi den phong khach", "Mo den phong khach"),
-            ("bat quat phong ngu", "Bat quat phong ngu"),
-            ("fridai hom nay thoi tiet sao", "Friday, hom nay thoi tiet sao?"),
-            ("goi cho me toi", "Goi cho me toi"),
-            ("tat smart hom", "Tat Smart Home"),
+            ("mở đèn phòng khách", "Mở đèn phòng khách"),
+            ("bật quạt phòng ngủ", "Bật quạt phòng ngủ"),
+            ("fridai hôm nay thời tiết sao", "Friday, hôm nay thời tiết sao?"),
+            ("gọi cho mẹ tôi", "Gọi cho mẹ tôi"),
+            ("tắt smart home", "Tắt Smart Home"),
         ]

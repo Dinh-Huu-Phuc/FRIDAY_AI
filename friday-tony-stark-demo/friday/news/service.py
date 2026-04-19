@@ -1,59 +1,60 @@
 from __future__ import annotations
 
-import logging
-
-from .client import NewsDataClient
-from .constants import (
-    DEFAULT_NEWS_COUNTRY,
-    DEFAULT_NEWS_LANGUAGE,
-    DEFAULT_NEWS_LIMIT,
-    DEFAULT_NEWS_REQUEST_TIMEOUT,
-)
-from .formatter import (
-    build_agent_news_context,
-    build_news_fallback_message,
-    normalize_articles,
-)
-from .intent import extract_news_filters, is_news_query
+from .VN import NewsService as VNNewsService
+from .VN import extract_news_filters, is_news_query, looks_like_daily_news_request
 from .schemas import NewsQuery, NewsServiceResult
-
-logger = logging.getLogger("friday-news-service")
+from .world import WorldNewsService, detect_news_scope, looks_like_world_news_request
 
 
 class NewsService:
-    """
-    News orchestration layer used by the agent runtime.
-    """
+    """Lớp điều phối tin tức giữa nguồn Việt Nam và nguồn thế giới."""
 
     def __init__(
         self,
         *,
         api_key: str,
-        default_language: str = DEFAULT_NEWS_LANGUAGE,
-        default_country: str = DEFAULT_NEWS_COUNTRY,
-        default_limit: int = DEFAULT_NEWS_LIMIT,
-        timeout_seconds: float = DEFAULT_NEWS_REQUEST_TIMEOUT,
+        world_api_key: str = "",
+        default_language: str = "vi",
+        default_country: str = "vn",
+        default_limit: int = 6,
+        timeout_seconds: float = 8.0,
     ) -> None:
         self.default_language = default_language
         self.default_country = default_country
         self.default_limit = default_limit
-        self.client = NewsDataClient(
+        self.vn_service = VNNewsService(
             api_key=api_key,
+            default_language=default_language,
+            default_country=default_country,
+            default_limit=default_limit,
+            timeout_seconds=timeout_seconds,
+        )
+        self.world_service = WorldNewsService(
+            api_key=world_api_key,
+            default_limit=default_limit,
             timeout_seconds=timeout_seconds,
         )
 
     def parse_query(self, user_text: str) -> NewsQuery:
-        return extract_news_filters(
+        base_query = extract_news_filters(
             user_text,
             default_language=self.default_language,
             default_country=self.default_country,
             default_limit=self.default_limit,
         )
+        scope = detect_news_scope(
+            user_text,
+            country_code=base_query.country,
+            topic=base_query.topic,
+        )
+        if scope == "world":
+            return self.world_service.parse_query(user_text)
+        return self.vn_service.parse_query(user_text)
 
     def handle_user_query(self, user_text: str) -> NewsServiceResult:
         text = str(user_text or "").strip()
         if not text:
-            query = self.parse_query("")
+            query = self.parse_query(text)
             return NewsServiceResult(
                 is_news_intent=False,
                 status="not_news",
@@ -64,7 +65,23 @@ class NewsService:
                 error=None,
             )
 
-        if not is_news_query(text):
+        base_query = extract_news_filters(
+            text,
+            default_language=self.default_language,
+            default_country=self.default_country,
+            default_limit=self.default_limit,
+        )
+        scope = detect_news_scope(
+            text,
+            country_code=base_query.country,
+            topic=base_query.topic,
+        )
+        is_supported_news_intent = is_news_query(text) or (
+            scope == "vn" and looks_like_daily_news_request(text)
+        ) or (
+            scope == "world" and looks_like_world_news_request(text)
+        )
+        if not is_supported_news_intent:
             query = self.parse_query(text)
             return NewsServiceResult(
                 is_news_intent=False,
@@ -77,67 +94,14 @@ class NewsService:
             )
 
         query = self.parse_query(text)
-        fetch_result = self.client.fetch_latest(query)
-
-        if not fetch_result.ok:
-            reason = str(fetch_result.error or "api_error").split(":", maxsplit=1)[0]
-            fallback = build_news_fallback_message(reason=reason)
-            context = build_agent_news_context(
-                query=query,
-                articles=[],
-                status="error",
-                fallback_message=fallback,
-            )
-            return NewsServiceResult(
-                is_news_intent=True,
-                status="error",
-                query=query,
-                articles=[],
-                agent_context=context,
-                fallback_message=fallback,
-                error=fetch_result.error,
-            )
-
-        cleaned = normalize_articles(fetch_result.articles, limit=query.limit)
-        if not cleaned:
-            fallback = build_news_fallback_message(reason="no_data")
-            context = build_agent_news_context(
-                query=query,
-                articles=[],
-                status="no_data",
-                fallback_message=fallback,
-            )
-            return NewsServiceResult(
-                is_news_intent=True,
-                status="no_data",
-                query=query,
-                articles=[],
-                agent_context=context,
-                fallback_message=fallback,
-                error=None,
-            )
-
-        context = build_agent_news_context(
-            query=query,
-            articles=cleaned,
-            status="ok",
-            fallback_message="",
+        scope = detect_news_scope(
+            text,
+            country_code=query.country,
+            topic=query.topic,
         )
+        if scope == "world":
+            return self.world_service.handle_user_query(text)
+        return self.vn_service.handle_user_query(text)
 
-        logger.info(
-            "News fetched status=ok topic=%s country=%s language=%s count=%s",
-            query.topic,
-            query.country,
-            query.language,
-            len(cleaned),
-        )
 
-        return NewsServiceResult(
-            is_news_intent=True,
-            status="ok",
-            query=query,
-            articles=cleaned,
-            agent_context=context,
-            fallback_message="",
-            error=None,
-        )
+__all__ = ["NewsService", "VNNewsService", "WorldNewsService"]

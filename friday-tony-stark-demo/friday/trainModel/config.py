@@ -51,6 +51,8 @@ class TrainModelConfig:
     memory_user_interest_limit: int = 40
     memory_user_habit_limit: int = 30
     memory_user_note_limit: int = 50
+    memory_project_item_limit: int = 40
+    memory_task_item_limit: int = 40
     memory_max_text_chars: int = 1200
     memory_session_ttl_seconds: int = 7 * 24 * 3600
 
@@ -131,4 +133,3 @@ def build_default_config() -> TrainModelConfig:
     config = TrainModelConfig()
     config.ensure_directories()
     return config
-
