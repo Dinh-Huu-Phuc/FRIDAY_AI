@@ -1,4 +1,4 @@
-"""
+﻿"""
 FRIDAY - Voice Agent (MCP-powered)
 ==================================
 Iron Man-style voice assistant that controls RGB lighting, runs diagnostics,
@@ -8,35 +8,35 @@ running on the Windows host.
 MCP Server URL is auto-resolved from WSL to Windows host IP.
 
 Run:
-  uv run agent_friday.py dev      - LiveKit Cloud mode
-  uv run agent_friday.py console  - text-only console mode
+  uv run server/agent_friday.py dev      - LiveKit Cloud mode
+  uv run server/agent_friday.py console  - text-only console mode
 """
 
 import asyncio
 import logging
 import os
+import re
 import subprocess
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-=======
 import threading
 from collections import deque
-from pathlib import Path
->>>>>>> Stashed changes
-=======
 from datetime import datetime
->>>>>>> a82bc93a1a54ba13cc8984b14679fdadbeeba01a
+from pathlib import Path
 
 from dotenv import load_dotenv
+from friday.app import open_social_platform, resolve_social_platform
 from friday.config import config
 from friday.googleServiceCloud.credentials import ensure_google_application_credentials
 from friday.log import DailyInteractionLogger
 from friday.messages.promt_agent_friday import (
     build_agent_instructions,
-    build_startup_reply_instruction,
+    build_daily_briefing_runtime_hint,
+    build_startup_greeting,
 )
 from friday.news import NewsService
+from friday.prompts import build_social_open_runtime_hint
 from friday.refiner import STTCorrector
+from friday.runtime_context import resolve_runtime_location
+from friday.search import get_weather_snapshot
 from friday.trainModel import BatchTrainingScheduler, ConversationDatasetStore, TrainModelConfig
 from friday.trainModel.memory import MemoryManager
 from livekit.agents import JobContext, WorkerOptions, cli
@@ -69,7 +69,6 @@ SARVAM_TTS_SPEAKER = "rahul"
 MCP_SERVER_PORT = 8000
 
 # ---------------------------------------------------------------------------
-<<<<<<< Updated upstream
 # System prompt - F.R.I.D.A.Y.
 # ---------------------------------------------------------------------------
 
@@ -156,9 +155,9 @@ Sai: "Thị trường vận hành tích cực với mức tăng trên các chỉ
 
 SYSTEM_PROMPT += """
 
-## Loi chao luc khoi dong
+## Lời chào lúc khởi động
 
-Khi phien bat dau, hay chao theo gio he thong hien tai:
+Khi phiên bắt đầu, hãy chào theo giờ hệ thống hiện tại:
 - 05:00-10:59 -> "Chào buổi sáng, sếp."
 - 11:00-12:59 -> "Chào buổi trưa, sếp."
 - 13:00-17:59 -> "Chào buổi chiều, sếp."
@@ -183,10 +182,10 @@ SEARCH_RULES += """
 
 ## Weather routing
 
-- Khi nguoi dung hoi thoi tiet, du bao, mua nang, nhiet do, do am, hay gio theo dia diem,
-  uu tien goi tool `get_weather`.
-- Tool `get_weather` co the hieu ten thanh pho Viet Nam theo kieu co dau, khong dau, viet tat hoac ten quen dung.
-- Neu chua co dia diem cu the, hay hoi lai ngan gon dia diem can xem thoi tiet.
+- Khi người dùng hỏi thời tiết, dự báo, mưa nắng, nhiệt độ, độ ẩm, hay gió theo địa điểm,
+  ưu tiên gọi tool `get_weather`.
+- Tool `get_weather` có thể hiểu tên thành phố Việt Nam theo kiểu có dấu, không dấu, viết tắt hoặc tên quen dùng.
+- Nếu chưa có địa điểm cụ thể, hãy hỏi lại ngắn gọn địa điểm cần xem thời tiết.
 """.strip()
 
 # ---------------------------------------------------------------------------
@@ -218,14 +217,12 @@ def _build_startup_greeting(now=None) -> str:
     )
 
 load_dotenv()
-=======
 # Bootstrap
 # ---------------------------------------------------------------------------
 
-_ENV_PATH = Path(__file__).resolve().parent / ".env"
+_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(dotenv_path=_ENV_PATH, override=True)
 ensure_google_application_credentials()
->>>>>>> Stashed changes
 
 logger = logging.getLogger("friday-agent")
 logger.setLevel(logging.INFO)
@@ -276,6 +273,43 @@ def _mcp_server_url() -> str:
     url = f"http://127.0.0.1:{MCP_SERVER_PORT}/sse"
     logger.info("MCP Server URL: %s", url)
     return url
+
+
+SOCIAL_OPEN_INTENT_PATTERN = re.compile(
+    r"\b(mo|mở|vao|vào|truy\s*cap|truy\s*cập|open)\b",
+    re.IGNORECASE,
+)
+DAILY_BRIEFING_PATTERN = re.compile(
+    r"\b(briefing|báo nhanh|báo cáo nhanh|bắt đầu ngày|đầu ngày|đầu phiên|tóm tắt hôm nay|hôm nay có gì|việc đang dở)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_social_open_request(text: str) -> bool:
+    candidate = str(text or "").strip()
+    if not candidate:
+        return False
+    if resolve_social_platform(candidate) is None:
+        return False
+    return bool(SOCIAL_OPEN_INTENT_PATTERN.search(candidate))
+
+
+def _is_daily_briefing_request(text: str) -> bool:
+    candidate = str(text or "").strip()
+    if not candidate:
+        return False
+    return bool(DAILY_BRIEFING_PATTERN.search(candidate))
+
+
+async def _build_startup_weather_summary() -> str:
+    location = resolve_runtime_location()
+    snapshot = await get_weather_snapshot(city=location.city, country=location.country)
+    if bool(snapshot.get("ok")):
+        location_text = str(snapshot.get("location_text") or location.display_name)
+        description = str(snapshot.get("description") or "thời tiết chưa rõ")
+        temp = str(snapshot.get("temp") or "chưa rõ")
+        return f"Thời tiết hiện tại ở {location_text}: {description}, {temp} độ C."
+    return f"Tôi chưa cập nhật được thời tiết hiện tại ở {location.display_name}."
 
 
 # ---------------------------------------------------------------------------
@@ -384,29 +418,11 @@ class FridayAgent(Agent):
         )
 
     async def on_enter(self) -> None:
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-        """Greet the user specifically for the late-night lab session."""
-=======
         """Greet the user based on the machine's current local time."""
-        greeting = _build_startup_greeting()
-        await self.session.generate_reply(
-            instructions=(
-                "Chào người dùng dùng nguyên văn câu sau, không thêm bớt ý nào khác: "
-                f"'{greeting}'"
-            )
-        )
-        return
->>>>>>> a82bc93a1a54ba13cc8984b14679fdadbeeba01a
-        await self.session.generate_reply(
-            instructions=(
-                "Chào người dùng đúng nguyên văn như sau: "
-                "'Sếp còn thức khuya à? Tối nay mình xử lý gì đây?' "
-                "Giữ tông điệu hữu ích, điềm tĩnh và hơi khô hài nhẹ."
-=======
-        """Greet the user based on the machine's current local time."""
-        await self.session.generate_reply(
-            instructions=build_startup_reply_instruction()
+        weather_summary = await _build_startup_weather_summary()
+        await self.session.say(
+            build_startup_greeting(weather_summary=weather_summary),
+            add_to_chat_ctx=True,
         )
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
@@ -439,7 +455,6 @@ class FridayAgent(Agent):
                 raw_user_text,
                 language=GOOGLE_STT_LANGUAGE,
                 conversation_hint=memory_hint[:300],
->>>>>>> Stashed changes
             )
             refined_user_text = correction.refined_text or raw_user_text
             refiner_provider = correction.provider
@@ -453,12 +468,31 @@ class FridayAgent(Agent):
                 refined_user_text[:160],
             )
 
+        social_platform: str | None = None
+        social_open_result = ""
+        if _is_social_open_request(refined_user_text):
+            social_platform = resolve_social_platform(refined_user_text)
+            social_open_result = await asyncio.to_thread(
+                open_social_platform,
+                refined_user_text,
+            )
+            logger.info(
+                "Social open request detected platform=%s result=%s text='%s'",
+                social_platform,
+                social_open_result,
+                refined_user_text[:160],
+            )
+
+        daily_briefing_hint = ""
+        if _is_daily_briefing_request(refined_user_text):
+            daily_briefing_hint = build_daily_briefing_runtime_hint()
+
         news_status = "not_news"
         news_topic: str | None = None
         news_country: str | None = None
         news_count = 0
         news_context = ""
-        if self._news_service is not None:
+        if not social_open_result and self._news_service is not None:
             try:
                 news_result = await asyncio.to_thread(
                     self._news_service.handle_user_query,
@@ -483,8 +517,8 @@ class FridayAgent(Agent):
                 news_context = (
                     "[NEWS_CONTEXT]\n"
                     "status=error\n"
-                    "fallback_user_message=Luong tin dang chap chon, sep. Muon toi thu lai ngay khong?\n"
-                    "response_rules=Tra loi ngan gon bang tieng Viet, khong noi ky thuat noi bo."
+                    "fallback_user_message=Luồng tin đang chập chờn, sếp. Muốn tôi thử lại ngay không?\n"
+                    "response_rules=Trả lời ngắn gọn bằng tiếng Việt, không nói kỹ thuật nội bộ."
                 )
 
         if self._pending_user_turns is not None:
@@ -497,7 +531,16 @@ class FridayAgent(Agent):
             )
 
         if self._memory_manager is None or not self._memory_session_id:
-            if news_context:
+            if social_open_result:
+                social_hint = build_social_open_runtime_hint(
+                    command=refined_user_text,
+                    platform_name=social_platform,
+                    assistant_reply=social_open_result,
+                )
+                new_message.content = [f"{social_hint}\n\n[CURRENT_USER_MESSAGE]\n{refined_user_text}"]
+            elif daily_briefing_hint:
+                new_message.content = [f"{daily_briefing_hint}\n\n[CURRENT_USER_MESSAGE]\n{refined_user_text}"]
+            elif news_context:
                 new_message.content = [f"{news_context}\n\n[CURRENT_USER_MESSAGE]\n{refined_user_text}"]
             else:
                 new_message.content = [refined_user_text]
@@ -508,7 +551,17 @@ class FridayAgent(Agent):
             user_id=self._memory_user_id,
         )
         composed_parts = [memory_prefix.strip()]
-        if news_context:
+        if social_open_result:
+            composed_parts.append(
+                build_social_open_runtime_hint(
+                    command=refined_user_text,
+                    platform_name=social_platform,
+                    assistant_reply=social_open_result,
+                ).strip()
+            )
+        elif daily_briefing_hint:
+            composed_parts.append(daily_briefing_hint.strip())
+        elif news_context:
             composed_parts.append(news_context.strip())
         composed_parts.append(f"[CURRENT_USER_MESSAGE]\n{refined_user_text}")
         new_message.content = ["\n\n".join(part for part in composed_parts if part)]
@@ -523,6 +576,9 @@ class FridayAgent(Agent):
         new_message.extra["news_topic"] = news_topic
         new_message.extra["news_country"] = news_country
         new_message.extra["news_count"] = news_count
+        new_message.extra["social_open_platform"] = social_platform
+        new_message.extra["social_open_result"] = social_open_result
+        new_message.extra["daily_briefing_requested"] = bool(daily_briefing_hint)
 
     def bind_pending_turns(self, queue: deque[dict[str, str | bool | None]]) -> None:
         self._pending_user_turns = queue
@@ -585,6 +641,7 @@ def _build_train_model_config() -> TrainModelConfig:
 def _build_news_service() -> NewsService:
     return NewsService(
         api_key=config.NEWSDATA_API_KEY,
+        world_api_key=config.WORLD_NEWS,
         default_language=config.NEWS_DEFAULT_LANGUAGE,
         default_country=config.NEWS_DEFAULT_COUNTRY,
         default_limit=config.NEWS_DEFAULT_LIMIT,
@@ -792,3 +849,4 @@ def dev():
 
 if __name__ == "__main__":
     main()
+

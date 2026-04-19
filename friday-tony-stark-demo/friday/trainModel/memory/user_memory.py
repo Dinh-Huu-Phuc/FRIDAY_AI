@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ..config import TrainModelConfig
-from .schemas import ExtractedSignal, SessionMemory, UserMemory, UserPreference
+from .schemas import ExtractedSignal, ProjectMemory, SessionMemory, TaskMemory, UserMemory, UserPreference
 from .store import MemoryStore
 
 
@@ -26,6 +26,8 @@ class UserMemoryService:
             return UserMemory(user_id=user_id)
 
         pref_payload = payload.get("preference", {})
+        project_payload = payload.get("project_memory", {})
+        task_payload = payload.get("task_memory", {})
         preference = UserPreference(
             preferred_name=pref_payload.get("preferred_name"),
             addressing_style=pref_payload.get("addressing_style"),
@@ -37,6 +39,17 @@ class UserMemoryService:
         return UserMemory(
             user_id=user_id,
             preference=preference,
+            project_memory=ProjectMemory(
+                active_projects=[str(item) for item in project_payload.get("active_projects", [])],
+                project_notes=[str(item) for item in project_payload.get("project_notes", [])],
+                technical_decisions=[str(item) for item in project_payload.get("technical_decisions", [])],
+            ),
+            task_memory=TaskMemory(
+                active_tasks=[str(item) for item in task_payload.get("active_tasks", [])],
+                paused_tasks=[str(item) for item in task_payload.get("paused_tasks", [])],
+                blockers=[str(item) for item in task_payload.get("blockers", [])],
+                next_steps=[str(item) for item in task_payload.get("next_steps", [])],
+            ),
             interests=[str(item) for item in payload.get("interests", [])],
             habits=[str(item) for item in payload.get("habits", [])],
             notes=[str(item) for item in payload.get("notes", [])],
@@ -48,6 +61,34 @@ class UserMemoryService:
         memory.interests = self._dedupe_and_limit(memory.interests, self.config.memory_user_interest_limit)
         memory.habits = self._dedupe_and_limit(memory.habits, self.config.memory_user_habit_limit)
         memory.notes = self._dedupe_and_limit(memory.notes, self.config.memory_user_note_limit)
+        memory.project_memory.active_projects = self._dedupe_and_limit(
+            memory.project_memory.active_projects,
+            self.config.memory_project_item_limit,
+        )
+        memory.project_memory.project_notes = self._dedupe_and_limit(
+            memory.project_memory.project_notes,
+            self.config.memory_project_item_limit,
+        )
+        memory.project_memory.technical_decisions = self._dedupe_and_limit(
+            memory.project_memory.technical_decisions,
+            self.config.memory_project_item_limit,
+        )
+        memory.task_memory.active_tasks = self._dedupe_and_limit(
+            memory.task_memory.active_tasks,
+            self.config.memory_task_item_limit,
+        )
+        memory.task_memory.paused_tasks = self._dedupe_and_limit(
+            memory.task_memory.paused_tasks,
+            self.config.memory_task_item_limit,
+        )
+        memory.task_memory.blockers = self._dedupe_and_limit(
+            memory.task_memory.blockers,
+            self.config.memory_task_item_limit,
+        )
+        memory.task_memory.next_steps = self._dedupe_and_limit(
+            memory.task_memory.next_steps,
+            self.config.memory_task_item_limit,
+        )
         memory.last_updated = _now_ts()
         self.store.save_user_payload(memory.user_id, memory.to_dict())
 
@@ -68,6 +109,13 @@ class UserMemoryService:
         memory.interests.extend(signal.interests)
         memory.habits.extend(signal.habits)
         memory.notes.extend(signal.notes)
+        memory.project_memory.active_projects.extend(signal.active_projects)
+        memory.project_memory.project_notes.extend(signal.project_notes)
+        memory.project_memory.technical_decisions.extend(signal.technical_decisions)
+        memory.task_memory.active_tasks.extend(signal.active_tasks)
+        memory.task_memory.paused_tasks.extend(signal.paused_tasks)
+        memory.task_memory.blockers.extend(signal.blockers)
+        memory.task_memory.next_steps.extend(signal.next_steps)
         self.save(memory)
         return memory
 
@@ -75,6 +123,22 @@ class UserMemoryService:
         memory = self.load(user_id)
         if session_memory.summary:
             memory.notes.append(f"session_summary:{session_memory.summary}")
+        for turn in session_memory.turns[-8:]:
+            metadata = turn.metadata or {}
+            active_project = str(metadata.get("active_project") or "").strip()
+            if active_project:
+                memory.project_memory.active_projects.append(active_project)
+            for field_name, target in (
+                ("technical_decision", memory.project_memory.technical_decisions),
+                ("project_note", memory.project_memory.project_notes),
+                ("active_task", memory.task_memory.active_tasks),
+                ("paused_task", memory.task_memory.paused_tasks),
+                ("blocker", memory.task_memory.blockers),
+                ("next_step", memory.task_memory.next_steps),
+            ):
+                value = str(metadata.get(field_name) or "").strip()
+                if value:
+                    target.append(value)
         self.save(memory)
         return memory
 
@@ -96,4 +160,3 @@ class UserMemoryService:
         if len(cleaned) <= limit:
             return cleaned
         return cleaned[-limit:]
-

@@ -10,56 +10,84 @@ from pathlib import Path
 LLM_DESIGN_PRINCIPLES_PATH = Path(__file__).resolve().parent / "llm_design_principles.md"
 
 DEFAULT_LLM_DESIGN_PRINCIPLES = """
-1. Khong train model sau moi luot chat.
-2. Memory runtime chi dung cho suy luan thoi gian thuc, khong dung de train ngay.
-3. Du lieu train phai qua lam sach, safety filter, scoring va evaluate truoc khi promote.
-4. Luon co versioning, report va rollback.
+1. Không train model sau mỗi lượt chat.
+2. Memory runtime chỉ dùng cho suy luận thời gian thực, không dùng để train ngay.
+3. Dữ liệu train phải qua làm sạch, safety filter, scoring và evaluate trước khi promote.
+4. Luôn có versioning, report và rollback.
 """.strip()
 
 STT_REFINER_PROMPT_TEMPLATE = """
-Ban la bo xu ly chinh sua van ban Speech-to-Text cho tro ly AI Friday.
+Bạn là bộ xử lý chỉnh sửa văn bản Speech-to-Text cho trợ lý AI Friday.
 
-Nhiem vu:
-- Nhan 1 cau transcript tho.
-- Sua loi chinh ta, dau cau, loi nghe nham, loi thieu dau tieng Viet.
-- Uu tien tieng Viet tu nhien.
-- Uu tien dung tu custom vocabulary neu phu hop.
-- Giu nguyen y nghia goc cua nguoi dung.
-- Khong bien transcript thanh cau tra loi moi.
+Nhiệm vụ:
+- Nhận 1 câu transcript thô.
+- Sửa lỗi chính tả, dấu câu, lỗi nghe nhầm, lỗi thiếu dấu tiếng Việt.
+- Ưu tiên tiếng Việt tự nhiên.
+- Ưu tiên dùng từ custom vocabulary nếu phù hợp.
+- Giữ nguyên ý nghĩa gốc của người dùng.
+- Không biến transcript thành câu trả lời mới.
 
-Rang buoc bat buoc:
-- Chi tra ve DUY NHAT cau da chinh sua.
-- Khong giai thich.
-- Khong markdown.
-- Khong them dau ngoac kep.
-- Khong them loi dan.
-- Khong tra loi noi dung cau hoi.
-- Khong tra ve nhieu dong.
+Ràng buộc bắt buộc:
+- Chỉ trả về DUY NHẤT câu đã chỉnh sửa.
+- Không giải thích.
+- Không markdown.
+- Không thêm dấu ngoặc kép.
+- Không thêm lời dẫn.
+- Không trả lời nội dung câu hỏi.
+- Không trả về nhiều dòng.
 
-Vi du tham chieu:
-- input: "moi den phong khach" -> output: "Mo den phong khach"
-- input: "bat quat phong ngu" -> output: "Bat quat phong ngu"
-- input: "fridai hom nay thoi tiet sao" -> output: "Friday, hom nay thoi tiet sao?"
-- input: "goi cho me toi" -> output: "Goi cho me toi"
-- input: "tat smart hom" -> output: "Tat Smart Home"
+Ví dụ tham chiếu:
+- input: "mở đèn phòng khách" -> output: "Mở đèn phòng khách"
+- input: "bật quạt phòng ngủ" -> output: "Bật quạt phòng ngủ"
+- input: "fridai hôm nay thời tiết sao" -> output: "Friday, hôm nay thời tiết sao?"
+- input: "gọi cho mẹ tôi" -> output: "Gọi cho mẹ tôi"
+- input: "tắt smart home" -> output: "Tắt Smart Home"
 
-Thong tin bo tro:
+Thông tin bổ trợ:
 - language: {language}
 - conversation_hint: {conversation_hint}
 - custom_vocabulary:
 {custom_vocabulary}
 
-Transcript tho:
+Transcript thô:
 {raw_transcript}
 """.strip()
 
 NEWS_ROUTING_PROMPT_TEMPLATE = """
-Ban la Friday. Khi nhan duoc cau hoi tin tuc:
-- Neu nguoi dung hoi kieu "co gi moi", "tin hom nay", "cap nhat tin tuc", "tin cong nghe", "tin tai chinh", "tin AI":
-  uu tien dung module friday/news truoc.
-- Sau khi co du lieu, tom tat ngan gon bang tieng Viet tu nhien trong 3-5 cau.
-- Khong noi ve ky thuat, khong in JSON, khong liet ke dai dong.
-- Neu khong co du lieu hoac API loi, bao fallback an toan, binh tinh.
+Bạn là Friday. Khi nhận được câu hỏi tin tức:
+- Nếu người dùng hỏi kiểu "có gì mới", "tin hôm nay", "cập nhật tin tức", "tin công nghệ", "tin tài chính", "tin AI":
+  ưu tiên dùng module friday/news trước.
+- Sau khi có dữ liệu, tóm tắt ngắn gọn bằng tiếng Việt tự nhiên trong 3-5 câu.
+- Không nói về kỹ thuật, không in JSON, không liệt kê dài dòng.
+- Nếu không có dữ liệu hoặc API lỗi, báo fallback an toàn, bình tĩnh.
+""".strip()
+
+SOCIAL_ROUTING_PROMPT_TEMPLATE = """
+Bạn là Friday. Khi người dùng muốn mở, vào, truy cập, hoặc open một mạng xã hội:
+- Ưu tiên xử lý các nền tảng: facebook, youtube, instagram, tiktok, x, twitter, linkedin, pinterest, reddit, telegram, discord.
+- Phải gọi tool `open_social_platform_homepage` trước với tham số `command` là NGUYÊN VĂN câu người dùng.
+- Nếu tool trả về "Tôi đã mở rồi thưa sếp." thì chỉ được trả lời đúng nguyên văn câu đó.
+- Nếu tool trả về "Thưa sếp, tôi chưa xác định được mạng xã hội cần mở." thì chỉ được trả lời đúng nguyên văn câu đó.
+- Không thêm lời dẫn, không giải thích thêm, không nói về tool.
+""".strip()
+
+FACEBOOK_PAGE_ROUTING_PROMPT_TEMPLATE = """
+Bạn là Friday. Khi người dùng muốn kiểm tra, đọc, xem, hoặc tóm tắt tin nhắn Facebook hay Messenger của Facebook Page:
+- Ưu tiên gọi tool `check_facebook_messages`.
+- Nếu người dùng hỏi thông báo, bình luận, tương tác, feed event, hoặc notification của Facebook Page:
+  ưu tiên gọi tool `check_facebook_notifications`.
+- Sau khi tool trả kết quả, tóm tắt bằng tiếng Việt tự nhiên, ngắn gọn, không nói về tên tool.
+- Nếu tool báo chưa có dữ liệu đồng bộ, nói đúng ý nghĩa đó bằng tiếng Việt tự nhiên và nhắc nhở rằng cần webhook của Facebook Page.
+""".strip()
+
+SOCIAL_OPEN_RUNTIME_HINT_TEMPLATE = """
+[SOCIAL_OPEN_CONTEXT]
+- The current user request is a social-open command.
+- Resolved platform: {platform_name}
+- The browser action has already been executed in runtime.
+- Assistant reply for this turn must be exactly: "{assistant_reply}"
+- Do not add any extra words before or after that exact sentence.
+- Do not call any more tools for this turn.
 """.strip()
 
 
@@ -95,6 +123,27 @@ def build_stt_refiner_prompt(
 
 def get_news_routing_prompt() -> str:
     return NEWS_ROUTING_PROMPT_TEMPLATE
+
+
+def get_social_routing_prompt() -> str:
+    return SOCIAL_ROUTING_PROMPT_TEMPLATE
+
+
+def get_facebook_page_routing_prompt() -> str:
+    return FACEBOOK_PAGE_ROUTING_PROMPT_TEMPLATE
+
+
+def build_social_open_runtime_hint(
+    *,
+    command: str,
+    platform_name: str | None,
+    assistant_reply: str,
+) -> str:
+    _ = command
+    return SOCIAL_OPEN_RUNTIME_HINT_TEMPLATE.format(
+        platform_name=(platform_name or "unknown").strip() or "unknown",
+        assistant_reply=assistant_reply.strip(),
+    )
 
 
 def _load_text_file_with_fallback(*, file_path: Path, fallback_text: str) -> str:

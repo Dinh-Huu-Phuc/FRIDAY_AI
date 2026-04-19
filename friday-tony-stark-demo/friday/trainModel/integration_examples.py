@@ -37,7 +37,7 @@ def example_store_conversation_without_training() -> str:
     path = store.append_raw_turn(
         session_id="session_demo_001",
         user_id="user_demo",
-        user_message="moi den phong khach",
+        user_message="mở đèn phòng khách",
         assistant_message="Đã rõ, tôi mở đèn phòng khách ngay.",
         source="agent_runtime",
         refined_input="Mở đèn phòng khách",
@@ -83,9 +83,9 @@ def example_stt_refiner_usage() -> dict[str, Any]:
         timeout_seconds=2.0,
     )
     result = corrector.correct(
-        "fridai hom nay thoi tiet sao",
+        "fridai hôm nay thời tiết sao",
         language="vi-VN",
-        conversation_hint="Ngu canh tro ly nha thong minh",
+        conversation_hint="Ngữ cảnh trợ lý nhà thông minh",
     )
     return {
         "raw_text": result.raw_text,
@@ -101,9 +101,9 @@ def example_stt_refiner_input_output_pairs() -> list[dict[str, str]]:
     Example: five input/output pairs expected by the STT correction module.
     """
     return [
-        {"input": "moi den phong khach", "output": "Mo den phong khach"},
-        {"input": "bat quat phong ngu", "output": "Bat quat phong ngu"},
-        {"input": "fridai hom nay thoi tiet sao", "output": "Friday, hom nay thoi tiet sao?"},
-        {"input": "goi cho me toi", "output": "Goi cho me toi"},
-        {"input": "tat smart hom", "output": "Tat Smart Home"},
+        {"input": "mở đèn phòng khách", "output": "Mở đèn phòng khách"},
+        {"input": "bật quạt phòng ngủ", "output": "Bật quạt phòng ngủ"},
+        {"input": "fridai hôm nay thời tiết sao", "output": "Friday, hôm nay thời tiết sao?"},
+        {"input": "gọi cho mẹ tôi", "output": "Gọi cho mẹ tôi"},
+        {"input": "tắt smart home", "output": "Tắt Smart Home"},
     ]

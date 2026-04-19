@@ -60,6 +60,7 @@ class Config:
     BATCH_TRAINING_MIN_PENDING_SAMPLES: int = _get_int("BATCH_TRAINING_MIN_PENDING_SAMPLES", 50)
 
     NEWSDATA_API_KEY: str = os.getenv("NEWSDATA_API_KEY", "")
+    WORLD_NEWS: str = os.getenv("WORLD_NEWS", "")
     NEWS_DEFAULT_LANGUAGE: str = os.getenv("NEWS_DEFAULT_LANGUAGE", "vi").strip().lower() or "vi"
     NEWS_DEFAULT_COUNTRY: str = os.getenv("NEWS_DEFAULT_COUNTRY", "vn").strip().lower() or "vn"
     NEWS_DEFAULT_LIMIT: int = _get_int("NEWS_DEFAULT_LIMIT", 6)

@@ -5,6 +5,8 @@ System tools — time, environment info, shell commands, etc.
 import datetime
 import platform
 
+from friday.runtime_context import build_runtime_context_snapshot
+
 
 def register(mcp):
 
@@ -22,3 +24,10 @@ def register(mcp):
             "machine": platform.machine(),
             "python_version": platform.python_version(),
         }
+
+    @mcp.tool()
+    def get_work_context() -> dict:
+        """Return FRIDAY's current device and effective location context."""
+        snapshot = build_runtime_context_snapshot()
+        snapshot["current_time"] = datetime.datetime.now().isoformat()
+        return snapshot
