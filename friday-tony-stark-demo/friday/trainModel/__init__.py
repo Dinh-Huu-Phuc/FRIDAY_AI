@@ -5,7 +5,7 @@ from .conversation_store import ConversationDatasetStore
 from .dataset_builder import DatasetBuilder
 from .evaluator import CandidateEvaluator
 from .memory import MemoryManager
-from .pipeline import run_training_pipeline
+from .pipeline import run_emotion_inference_pipeline, run_training_pipeline
 from .scheduler import BatchTrainingScheduler
 from .safety_filter import SafetyFilter
 from .scorer import SampleScorer
@@ -21,6 +21,7 @@ __all__ = [
     "DatasetBuilder",
     "MemoryManager",
     "VersionManager",
+    "run_emotion_inference_pipeline",
     "SafetyFilter",
     "SampleScorer",
     "TrainModelConfig",

@@ -9,6 +9,8 @@ dependencies = [
     "httpx",
     "livekit-agents[deepgram,groq,openai,sarvam,silero]>=1.5.1",
     "livekit-plugins-google>=1.5.1",
+    "pydantic>=2.7",
+    "pyautogui>=0.9.54",
     "python-dotenv",
 ]
 

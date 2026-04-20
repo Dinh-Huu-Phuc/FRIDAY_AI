@@ -6,6 +6,7 @@ from typing import Any
 from friday.runtime_context import build_runtime_context_snapshot
 
 from ..config import TrainModelConfig, build_default_config
+from ..emotion_math import build_utterance_embedding, compute_entropy
 from .extractor import MemoryExtractor
 from .session_memory import SessionMemoryService
 from .store import MemoryStore
@@ -36,6 +37,9 @@ class MemoryManager:
             "session_id": session_id,
             "user_id": user_id,
             "session_summary": session_memory.summary,
+            "session_emotion_vector": session_memory.current_emotion_vector,
+            "session_mood": session_memory.session_mood,
+            "session_entropy": session_memory.last_entropy,
             "recent_turns": [
                 {
                     "user_message": turn.user_message,
@@ -47,6 +51,8 @@ class MemoryManager:
             "user_preference": user_memory.preference.to_dict() if user_memory else {},
             "project_memory": user_memory.project_memory.to_dict() if user_memory else {},
             "task_memory": user_memory.task_memory.to_dict() if user_memory else {},
+            "user_style_embedding": user_memory.style_embedding if user_memory else [],
+            "user_style_projection": user_memory.style_projection if user_memory else {},
             "user_interests": user_memory.interests if user_memory else [],
             "user_habits": user_memory.habits if user_memory else [],
             "user_notes": user_memory.notes[-10:] if user_memory else [],
@@ -135,6 +141,23 @@ class MemoryManager:
         if context["session_summary"]:
             lines.append(f"- recent_session_summary: {context['session_summary']}")
             has_stable_memory = True
+        if context["session_mood"]:
+            mood_summary = ", ".join(
+                f"{label}={score:.2f}"
+                for label, score in sorted(context["session_mood"].items(), key=lambda item: item[1], reverse=True)[:3]
+            )
+            lines.append(f"- session_mood: {mood_summary}")
+            has_stable_memory = True
+        if context["session_entropy"] is not None:
+            lines.append(f"- emotion_entropy: {float(context['session_entropy']):.4f}")
+            has_stable_memory = True
+        if context["user_style_projection"]:
+            style_summary = ", ".join(
+                f"{label}={score:.2f}"
+                for label, score in sorted(context["user_style_projection"].items(), key=lambda item: item[1], reverse=True)[:3]
+            )
+            lines.append(f"- long_term_style_projection: {style_summary}")
+            has_stable_memory = True
 
         if not has_stable_memory:
             lines.append("- no_stable_memory_detected_yet")
@@ -150,20 +173,80 @@ class MemoryManager:
     ) -> None:
         safe_user_message = self._sanitize_for_memory(user_message)
         safe_assistant_message = self._sanitize_for_memory(assistant_message)
+        active_metadata = dict(metadata or {})
+        if "utterance_embedding" not in active_metadata:
+            active_metadata["utterance_embedding"] = build_utterance_embedding(
+                safe_user_message,
+                dimensions=self.config.emotion_embedding_dimensions,
+            )
+        if isinstance(active_metadata.get("emotion_vector"), dict) and "emotion_entropy" not in active_metadata:
+            active_metadata["emotion_entropy"] = compute_entropy(
+                {str(key): float(value) for key, value in dict(active_metadata["emotion_vector"]).items()},
+                epsilon=self.config.emotion_entropy_epsilon,
+            )
         session_memory = self.session_service.append_turn(
             session_id=session_id,
             user_id=user_id,
             user_message=safe_user_message,
             assistant_message=safe_assistant_message,
-            metadata=metadata or {},
+            metadata=active_metadata,
         )
 
         if user_id:
             signal = self.extractor.extract(safe_user_message, safe_assistant_message)
             if signal.confidence >= 0.2:
                 self.user_service.update_from_signal(user_id, signal)
+            embedding = active_metadata.get("utterance_embedding")
+            if isinstance(embedding, list) and embedding:
+                self.user_service.update_style_memory(user_id, [float(item) for item in embedding])
             if len(session_memory.turns) >= 6:
                 self.user_service.merge_session_memory(user_id, session_memory)
+
+    def load_emotion_context(self, session_id: str, user_id: str | None = None) -> dict[str, Any]:
+        session_memory = self.session_service.load(session_id)
+        user_memory = self.user_service.load(user_id) if user_id else None
+        return {
+            "session_emotion_vector": dict(session_memory.current_emotion_vector),
+            "session_mood": dict(session_memory.session_mood),
+            "session_entropy": session_memory.last_entropy,
+            "last_utterance_embedding": list(session_memory.last_utterance_embedding),
+            "user_style_embedding": list(user_memory.style_embedding) if user_memory else [],
+            "user_style_projection": dict(user_memory.style_projection) if user_memory else {},
+        }
+
+    def update_emotion_state(
+        self,
+        *,
+        session_id: str,
+        user_id: str | None,
+        user_message: str,
+        emotion_vector: dict[str, float],
+        utterance_embedding: list[float] | None = None,
+        entropy: float | None = None,
+    ) -> dict[str, Any]:
+        embedding = utterance_embedding or build_utterance_embedding(
+            user_message,
+            dimensions=self.config.emotion_embedding_dimensions,
+        )
+        entropy_value = entropy
+        if entropy_value is None:
+            entropy_value = compute_entropy(emotion_vector, epsilon=self.config.emotion_entropy_epsilon)
+
+        session_memory = self.session_service.update_emotion_state(
+            session_id,
+            emotion_vector=emotion_vector,
+            entropy=entropy_value,
+            utterance_embedding=embedding,
+        )
+        user_memory = self.user_service.update_style_memory(user_id, embedding) if user_id else None
+        return {
+            "session_emotion_vector": dict(session_memory.current_emotion_vector),
+            "session_mood": dict(session_memory.session_mood),
+            "session_entropy": session_memory.last_entropy,
+            "user_style_embedding": list(user_memory.style_embedding) if user_memory else [],
+            "user_style_projection": dict(user_memory.style_projection) if user_memory else {},
+            "utterance_embedding": list(embedding),
+        }
 
     def merge_session_to_user(self, session_id: str, user_id: str) -> None:
         session_memory = self.session_service.load(session_id)

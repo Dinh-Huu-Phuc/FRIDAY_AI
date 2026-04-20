@@ -6,9 +6,13 @@ Run with: python server/server.py
 import json
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import ValidationError
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 
+from friday.app.computer.exceptions import ComputerError
+from friday.app.computer.router.routes import execute_computer_action, observe_computer, plan_computer, run_computer_cycle
+from friday.app.computer.schemas.requests import ExecuteRequest, ObserveRequest, PlanRequest, RunRequest
 from friday.app.facebook.exceptions import (
     FacebookConfigurationError,
     FacebookWebhookSignatureError,
@@ -35,6 +39,21 @@ mcp = FastMCP(
 register_all_tools(mcp)
 register_all_prompts(mcp)
 register_all_resources(mcp)
+
+
+async def _read_json_payload(request: Request) -> dict:
+    raw_body = await request.body()
+    if not raw_body:
+        return {}
+    try:
+        return json.loads(raw_body.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError("Invalid JSON payload.") from exc
+
+
+async def _load_model(request: Request, model_cls):
+    payload = await _read_json_payload(request)
+    return model_cls.model_validate(payload)
 
 
 @mcp.custom_route("/facebook/webhook", methods=["GET"], name="facebook-webhook-verify")
@@ -87,6 +106,62 @@ async def facebook_webhook_ingest(request: Request) -> Response:
         },
         status_code=200,
     )
+
+
+@mcp.custom_route("/computer/observe", methods=["POST"], name="computer-observe")
+async def computer_observe(request: Request) -> Response:
+    try:
+        response = observe_computer(await _load_model(request, ObserveRequest))
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    except ValidationError as exc:
+        return JSONResponse({"ok": False, "message": "Invalid observe payload.", "details": exc.errors()}, status_code=422)
+    except ComputerError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+
+    return JSONResponse(response.model_dump(by_alias=True, mode="json"), status_code=200)
+
+
+@mcp.custom_route("/computer/plan", methods=["POST"], name="computer-plan")
+async def computer_plan(request: Request) -> Response:
+    try:
+        response = plan_computer(await _load_model(request, PlanRequest))
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    except ValidationError as exc:
+        return JSONResponse({"ok": False, "message": "Invalid plan payload.", "details": exc.errors()}, status_code=422)
+    except ComputerError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+
+    return JSONResponse(response.model_dump(by_alias=True, mode="json"), status_code=200)
+
+
+@mcp.custom_route("/computer/execute", methods=["POST"], name="computer-execute")
+async def computer_execute(request: Request) -> Response:
+    try:
+        response = execute_computer_action(await _load_model(request, ExecuteRequest))
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    except ValidationError as exc:
+        return JSONResponse({"ok": False, "message": "Invalid execute payload.", "details": exc.errors()}, status_code=422)
+    except ComputerError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+
+    return JSONResponse(response.model_dump(by_alias=True, mode="json"), status_code=200)
+
+
+@mcp.custom_route("/computer/run", methods=["POST"], name="computer-run")
+async def computer_run(request: Request) -> Response:
+    try:
+        response = run_computer_cycle(await _load_model(request, RunRequest))
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    except ValidationError as exc:
+        return JSONResponse({"ok": False, "message": "Invalid run payload.", "details": exc.errors()}, status_code=422)
+    except ComputerError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+
+    return JSONResponse(response.model_dump(by_alias=True, mode="json"), status_code=200)
 
 
 def main() -> None:

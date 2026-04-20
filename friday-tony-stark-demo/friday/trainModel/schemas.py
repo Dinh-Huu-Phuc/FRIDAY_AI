@@ -55,6 +55,10 @@ class ScoredSample:
     keep: bool
     score_breakdown: dict[str, float] = field(default_factory=dict)
     drop_reasons: list[str] = field(default_factory=list)
+    emotion_vector: dict[str, float] = field(default_factory=dict)
+    session_mood: dict[str, float] = field(default_factory=dict)
+    fused_state: dict[str, float] = field(default_factory=dict)
+    entropy: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -160,3 +164,21 @@ class MemoryEntry:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+
+@dataclass(slots=True)
+class EmotionRuntimeState:
+    user_text: str
+    utterance_embedding: list[float] = field(default_factory=list)
+    emotion_vector: dict[str, float] = field(default_factory=dict)
+    session_mood: dict[str, float] = field(default_factory=dict)
+    user_style_embedding: list[float] = field(default_factory=list)
+    user_style_projection: dict[str, float] = field(default_factory=dict)
+    fused_state: dict[str, float] = field(default_factory=dict)
+    entropy: float = 0.0
+    response_tone: str = "neutral"
+    cautious_language: bool = False
+    suggested_prefix: str = ""
+    high_risk_override: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

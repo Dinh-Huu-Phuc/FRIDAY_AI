@@ -60,6 +60,10 @@ class SessionMemory:
     user_id: str | None = None
     turns: list[SessionTurn] = field(default_factory=list)
     summary: str = ""
+    current_emotion_vector: dict[str, float] = field(default_factory=dict)
+    session_mood: dict[str, float] = field(default_factory=dict)
+    last_entropy: float | None = None
+    last_utterance_embedding: list[float] = field(default_factory=list)
     created_at: float = field(default_factory=now_ts)
     last_updated: float = field(default_factory=now_ts)
 
@@ -75,6 +79,8 @@ class UserMemory:
     preference: UserPreference = field(default_factory=UserPreference)
     project_memory: ProjectMemory = field(default_factory=ProjectMemory)
     task_memory: TaskMemory = field(default_factory=TaskMemory)
+    style_embedding: list[float] = field(default_factory=list)
+    style_projection: dict[str, float] = field(default_factory=dict)
     interests: list[str] = field(default_factory=list)
     habits: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)

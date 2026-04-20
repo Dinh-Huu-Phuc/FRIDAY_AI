@@ -23,6 +23,9 @@ from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+from friday.app.computer.dependencies import get_computer_service
+from friday.app.computer.schemas.requests import RunRequest
+from friday.app.computer.schemas.responses import RunResponse
 from friday.app import open_social_platform, resolve_social_platform
 from friday.config import config
 from friday.googleServiceCloud.credentials import ensure_google_application_credentials
@@ -188,6 +191,62 @@ SEARCH_RULES += """
 - Nếu chưa có địa điểm cụ thể, hãy hỏi lại ngắn gọn địa điểm cần xem thời tiết.
 """.strip()
 
+WORLD_AND_FINANCE_MONITOR_RULES = """
+## Routing tin thế giới và tài chính qua MCP
+
+### Tin thế giới
+
+- Khi người dùng hỏi kiểu:
+  "Có gì mới không?", "Brief me", "Tóm tắt tình hình đi", "Thế giới đang có chuyện gì?",
+  "Có tin gì đáng chú ý?", "Cập nhật tin thế giới"
+  thì ưu tiên gọi tool `get_world_news` trước.
+- Sau khi có kết quả, tóm tắt ngắn gọn bằng tiếng Việt tự nhiên, khoảng 3 đến 5 câu.
+- Sau phần tóm tắt, nói ngắn gọn theo tinh thần:
+  "Để tôi mở màn hình theo dõi thế giới cho sếp."
+  rồi gọi tool `open_world_monitor`.
+- Không nói tên tool, không mô tả kỹ thuật nội bộ, không đọc nguyên văn dữ liệu thô.
+
+### Tin tài chính và thị trường
+
+- Khi người dùng hỏi kiểu:
+  "Thị trường hôm nay thế nào?", "Cập nhật tài chính", "Tin tài chính", "Market news",
+  "Kinh tế hôm nay có gì?", "Có gì đáng chú ý bên thị trường?"
+  thì ưu tiên gọi tool `get_world_finance_news` trước.
+- Sau khi có kết quả, tóm tắt ngắn gọn bằng tiếng Việt tự nhiên, khoảng 3 đến 5 câu,
+  chỉ giữ các ý ảnh hưởng lớn đến thị trường.
+- Sau phần tóm tắt, nói ngắn gọn theo tinh thần:
+  "Để tôi mở màn hình theo dõi tài chính cho sếp."
+  rồi gọi tool `open_finance_world_monitor`.
+- Không nói tên tool, không mô tả kỹ thuật nội bộ, không đọc nguyên văn dữ liệu RSS.
+
+### Hỏi chung về chứng khoán
+
+- Nếu người dùng hỏi chung chung về thị trường, cổ phiếu, index, hoặc chứng khoán
+  nhưng không nhất thiết yêu cầu tra cứu chi tiết, có thể trả lời ngắn tự nhiên trong 1 đến 2 câu,
+  theo phong cách trợ lý đang theo dõi thị trường sát sao.
+- Nếu người dùng muốn tin mới nhất, diễn biến hôm nay, hoặc cần xác minh, hãy ưu tiên
+  chuyển sang tool `get_world_finance_news`.
+
+### Quy tắc nói
+
+- Trước khi dùng các tool tin tức, chỉ nói một câu ngắn tự nhiên bằng tiếng Việt như:
+  "Để tôi kiểm tra một chút, sếp."
+- Sau khi hoàn tất phần tóm tắt, tự động mở monitor phù hợp mà không cần người dùng nhắc lại.
+- Giữ phản hồi nói ra ngắn, rõ, tự nhiên, đúng chất F.R.I.D.A.Y.
+""".strip()
+
+
+def _build_runtime_agent_instructions() -> str:
+    """
+    Compose the final runtime instruction set without replacing the existing
+    project-specific prompt stack.
+    """
+    return (
+        f"{build_agent_instructions()}\n\n"
+        f"{SEARCH_RULES}\n\n"
+        f"{WORLD_AND_FINANCE_MONITOR_RULES}"
+    )
+
 # ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
@@ -312,6 +371,16 @@ async def _build_startup_weather_summary() -> str:
     return f"Tôi chưa cập nhật được thời tiết hiện tại ở {location.display_name}."
 
 
+def run_computer_agent_cycle(goal: str, *, safety_mode: str | None = None) -> RunResponse:
+    """
+    Execute one observe -> plan -> safety-check -> execute cycle through the
+    dedicated computer service layer.
+    """
+    service = get_computer_service()
+    request = RunRequest(goal=goal, safety_mode=safety_mode)
+    return service.run_single_cycle(request)
+
+
 # ---------------------------------------------------------------------------
 # Build provider instances
 # ---------------------------------------------------------------------------
@@ -403,7 +472,7 @@ class FridayAgent(Agent):
         self._news_service = news_service
         self._pending_user_turns: deque[dict[str, str | bool | None]] | None = None
         super().__init__(
-            instructions=build_agent_instructions(),
+            instructions=_build_runtime_agent_instructions(),
             stt=stt,
             llm=llm,
             tts=tts,
