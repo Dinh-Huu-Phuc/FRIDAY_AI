@@ -2,6 +2,8 @@
 MCP prompts and shared prompt helpers.
 """
 
+from friday.prompts.constitution import get_computer_agent_constitution
+from friday.prompts.system_prompt import get_computer_agent_system_prompt
 from friday.prompts import templates
 
 
@@ -51,3 +53,16 @@ def build_social_open_runtime_hint(
         platform_name=platform_name,
         assistant_reply=assistant_reply,
     )
+
+
+__all__ = [
+    "build_social_open_runtime_hint",
+    "build_stt_refiner_prompt",
+    "get_computer_agent_constitution",
+    "get_computer_agent_system_prompt",
+    "get_facebook_page_routing_prompt",
+    "get_llm_design_principles_text",
+    "get_news_routing_prompt",
+    "get_social_routing_prompt",
+    "register_all_prompts",
+]

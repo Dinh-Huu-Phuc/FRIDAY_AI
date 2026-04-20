@@ -25,8 +25,10 @@ class CandidateEvaluator:
         quality_mean = float(metrics.get("quality_mean", 0.0))
         valid_loss = float(metrics.get("valid_loss", 9.99))
         test_loss = float(metrics.get("test_loss", 9.99))
+        macro_f1 = float(metrics.get("macro_f1", metrics.get("f1", 0.0)))
+        micro_f1 = float(metrics.get("micro_f1", 0.0))
 
-        candidate_score = self._candidate_score(pass_rate, quality_mean, valid_loss, test_loss)
+        candidate_score = self._candidate_score(pass_rate, quality_mean, valid_loss, test_loss, macro_f1, micro_f1)
         baseline_score = float(current_score if current_score is not None else 0.0)
         improvement = candidate_score - baseline_score
 
@@ -34,6 +36,8 @@ class CandidateEvaluator:
             "pass_rate_ok": pass_rate >= self.config.evaluation_min_pass_rate,
             "valid_loss_ok": valid_loss <= 1.2,
             "test_loss_ok": test_loss <= 1.3,
+            "macro_f1_ok": macro_f1 >= 0.45,
+            "micro_f1_ok": micro_f1 >= 0.45,
             "candidate_score_ok": candidate_score >= self.config.evaluation_min_candidate_score,
             "improvement_ok": (
                 improvement >= self.config.evaluation_required_improvement
@@ -73,8 +77,16 @@ class CandidateEvaluator:
         except Exception:
             return None
 
-    def _candidate_score(self, pass_rate: float, quality_mean: float, valid_loss: float, test_loss: float) -> float:
-        base = 0.25 + 0.45 * pass_rate + 0.35 * quality_mean
+    def _candidate_score(
+        self,
+        pass_rate: float,
+        quality_mean: float,
+        valid_loss: float,
+        test_loss: float,
+        macro_f1: float,
+        micro_f1: float,
+    ) -> float:
+        base = 0.20 + 0.35 * pass_rate + 0.25 * quality_mean + 0.12 * macro_f1 + 0.08 * micro_f1
         loss_penalty = min(0.35, max(0.0, (valid_loss - 0.25) * 0.18))
         test_penalty = min(0.30, max(0.0, (test_loss - 0.25) * 0.15))
         score = base - loss_penalty - test_penalty

@@ -55,6 +55,23 @@ class TrainModelConfig:
     memory_task_item_limit: int = 40
     memory_max_text_chars: int = 1200
     memory_session_ttl_seconds: int = 7 * 24 * 3600
+    emotion_labels: tuple[str, ...] = (
+        "joy",
+        "sadness",
+        "anger",
+        "frustration",
+        "fear",
+        "anxiety",
+        "neutral",
+    )
+    emotion_session_alpha: float = 0.8
+    emotion_user_style_lambda: float = 0.9
+    emotion_fusion_weight_current: float = 0.5
+    emotion_fusion_weight_session: float = 0.3
+    emotion_fusion_weight_user: float = 0.2
+    emotion_entropy_epsilon: float = 1e-12
+    emotion_high_entropy_threshold: float = 1.4
+    emotion_embedding_dimensions: int = 8
 
     auto_train_enabled: bool = True
     auto_train_check_interval_seconds: int = 300
@@ -99,6 +116,7 @@ class TrainModelConfig:
             self.memory_store_dir = self.storage_dir / "memory_store"
 
         self._normalize_split_ratios()
+        self._normalize_emotion_defaults()
 
     def _normalize_split_ratios(self) -> None:
         total = self.train_split_ratio + self.valid_split_ratio + self.test_split_ratio
@@ -110,6 +128,31 @@ class TrainModelConfig:
         self.train_split_ratio = self.train_split_ratio / total
         self.valid_split_ratio = self.valid_split_ratio / total
         self.test_split_ratio = self.test_split_ratio / total
+
+    def _normalize_emotion_defaults(self) -> None:
+        if not self.emotion_labels:
+            self.emotion_labels = (
+                "joy",
+                "sadness",
+                "anger",
+                "frustration",
+                "fear",
+                "anxiety",
+                "neutral",
+            )
+        total = (
+            self.emotion_fusion_weight_current
+            + self.emotion_fusion_weight_session
+            + self.emotion_fusion_weight_user
+        )
+        if total <= 0:
+            self.emotion_fusion_weight_current = 0.5
+            self.emotion_fusion_weight_session = 0.3
+            self.emotion_fusion_weight_user = 0.2
+            return
+        self.emotion_fusion_weight_current /= total
+        self.emotion_fusion_weight_session /= total
+        self.emotion_fusion_weight_user /= total
 
     def ensure_directories(self) -> None:
         required_dirs = (

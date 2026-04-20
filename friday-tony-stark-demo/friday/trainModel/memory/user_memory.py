@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ..config import TrainModelConfig
+from ..emotion_math import project_embedding_to_emotion_space, update_user_style_memory
 from .schemas import ExtractedSignal, ProjectMemory, SessionMemory, TaskMemory, UserMemory, UserPreference
 from .store import MemoryStore
 
@@ -50,6 +51,8 @@ class UserMemoryService:
                 blockers=[str(item) for item in task_payload.get("blockers", [])],
                 next_steps=[str(item) for item in task_payload.get("next_steps", [])],
             ),
+            style_embedding=[float(item) for item in payload.get("style_embedding", [])],
+            style_projection={str(key): float(value) for key, value in payload.get("style_projection", {}).items()},
             interests=[str(item) for item in payload.get("interests", [])],
             habits=[str(item) for item in payload.get("habits", [])],
             notes=[str(item) for item in payload.get("notes", [])],
@@ -144,6 +147,24 @@ class UserMemoryService:
 
     def forget_user(self, user_id: str) -> None:
         self.store.delete_user_payload(user_id)
+
+    def update_style_memory(
+        self,
+        user_id: str,
+        utterance_embedding: list[float],
+    ) -> UserMemory:
+        memory = self.load(user_id)
+        memory.style_embedding = update_user_style_memory(
+            memory.style_embedding,
+            utterance_embedding,
+            retention=self.config.emotion_user_style_lambda,
+        )
+        memory.style_projection = project_embedding_to_emotion_space(
+            memory.style_embedding,
+            labels=self.config.emotion_labels,
+        )
+        self.save(memory)
+        return memory
 
     def _dedupe_and_limit(self, values: list[str], limit: int) -> list[str]:
         cleaned: list[str] = []

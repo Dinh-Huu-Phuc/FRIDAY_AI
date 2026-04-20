@@ -62,6 +62,19 @@ class MemoryStore:
                 del payload[user_id]
                 self._write_json(self.users_path, payload)
 
+    def save_emotion_snapshot(
+        self,
+        *,
+        owner: str,
+        owner_id: str,
+        data: dict[str, Any],
+    ) -> None:
+        if owner == "session":
+            self.save_session_payload(owner_id, data)
+            return
+        if owner == "user":
+            self.save_user_payload(owner_id, data)
+
     def _ensure_store_files(self) -> None:
         if not self.sessions_path.exists():
             self._write_json(self.sessions_path, {})
@@ -84,4 +97,3 @@ class MemoryStore:
         temp_path = path.with_suffix(".tmp")
         temp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         temp_path.replace(path)
-
