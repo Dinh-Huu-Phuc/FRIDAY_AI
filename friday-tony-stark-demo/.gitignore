@@ -7,6 +7,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+friday/trainModel/agents/
+friday/trainModel/hooks/
+friday/trainModel/skills/
+
+
 # C extensions
 *.so
 
@@ -127,11 +132,23 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.uv-cache/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Secrets / local credentials
+*.pem
+*.key
+*.crt
+*.p12
+friday/googleServiceCloud/*.json
+
+# Runtime logs / generated data
+friday/log/saveLog/*.json
+friday/trainModel/storage/
 
 # Spyder project settings
 .spyderproject

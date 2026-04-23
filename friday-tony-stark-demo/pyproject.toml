@@ -9,16 +9,18 @@ dependencies = [
     "httpx",
     "livekit-agents[deepgram,groq,openai,sarvam,silero]>=1.5.1",
     "livekit-plugins-google>=1.5.1",
+    "pydantic>=2.7",
+    "pyautogui>=0.9.54",
     "python-dotenv",
 ]
 
 [project.scripts]
-friday = "server:main"
-friday_voice = "agent_friday:dev" # Points to the wrapper
+friday = "server.server:main"
+friday_voice = "server.agent_friday:dev" # Points to the wrapper
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["server.py"]
+packages = ["friday", "server"]

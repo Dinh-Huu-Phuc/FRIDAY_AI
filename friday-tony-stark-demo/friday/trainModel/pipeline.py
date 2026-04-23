@@ -10,10 +10,12 @@ from .collector import ConversationCollector
 from .config import TrainModelConfig, build_default_config
 from .conversation_store import ConversationDatasetStore
 from .dataset_builder import DatasetBuildResult, DatasetBuilder
+from .emotion_math import EmotionHeuristicModel, build_utterance_embedding
 from .evaluator import CandidateEvaluator
+from .memory import MemoryManager
 from .safety_filter import SafetyFilter
 from .scorer import SampleScorer
-from .schemas import EvaluationReport, ScoredSample, TrainingReport
+from .schemas import EmotionRuntimeState, EvaluationReport, ScoredSample, TrainingReport
 from .trainer import Trainer
 from .versioning import VersionManager
 
@@ -65,7 +67,7 @@ def run_training_pipeline(
     started_at = _now_iso()
     collector = ConversationCollector(cfg)
     cleaner = DataCleaner(cfg)
-    safety_filter = SafetyFilter()
+    safety_filter = SafetyFilter(cfg)
     scorer = SampleScorer(cfg)
     dataset_builder = DatasetBuilder(cfg)
     trainer = Trainer(cfg)
@@ -74,6 +76,7 @@ def run_training_pipeline(
     store = ConversationDatasetStore(cfg)
 
     try:
+        source_dataset_result = dataset_builder.build_from_sources(export_xlsx=False)
         raw_samples = collector.collect()
         raw_dump_path = collector.dump_raw_samples(raw_samples)
 
@@ -123,6 +126,7 @@ def run_training_pipeline(
                     "cleaned_path": str(cleaned_path),
                     "candidate_path": str(candidate_path),
                     "rejected_path": str(rejected_path),
+                    "source_dataset_result": source_dataset_result,
                 },
             )
             _write_pipeline_report(cfg, result)
@@ -186,6 +190,7 @@ def run_training_pipeline(
                 "candidate_path": str(candidate_path),
                 "rejected_path": str(rejected_path),
                 "curated_candidates_path": dataset_result.curated_candidates_path,
+                "source_dataset_result": source_dataset_result,
             },
             training_report=training_report.to_dict(),
             evaluation_report=evaluation_report.to_dict(),
@@ -214,3 +219,57 @@ def _write_pipeline_report(config: TrainModelConfig, result: PipelineResult) -> 
     report_path = config.reports_dir / filename
     report_path.write_text(json.dumps(result.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
 
+
+def run_emotion_inference_pipeline(
+    *,
+    user_text: str,
+    session_id: str,
+    user_id: str | None = None,
+    config: TrainModelConfig | None = None,
+    memory_manager: MemoryManager | None = None,
+) -> dict[str, Any]:
+    cfg = config or build_default_config()
+    manager = memory_manager or MemoryManager(cfg)
+    scorer = SampleScorer(cfg)
+    safety_filter = SafetyFilter(cfg)
+    heuristic_model = EmotionHeuristicModel(labels=list(cfg.emotion_labels))
+
+    utterance_embedding = build_utterance_embedding(
+        user_text,
+        dimensions=cfg.emotion_embedding_dimensions,
+    )
+    emotion_vector = heuristic_model.predict_probabilities(user_text)
+    emotion_context = manager.update_emotion_state(
+        session_id=session_id,
+        user_id=user_id,
+        user_message=user_text,
+        emotion_vector=emotion_vector,
+        utterance_embedding=utterance_embedding,
+    )
+    session_mood = dict(emotion_context.get("session_mood", {}))
+    user_style_projection = dict(emotion_context.get("user_style_projection", {}))
+    fused_state = scorer.fuse_emotion_state(
+        current_emotion=emotion_vector,
+        session_mood=session_mood,
+        user_style_embedding=list(emotion_context.get("user_style_embedding", [])),
+        user_style_projection=user_style_projection,
+    )
+    entropy = scorer.compute_entropy(emotion_vector)
+    policy = safety_filter.apply_emotion_uncertainty_policy(entropy=entropy)
+    tone = scorer.select_response_tone(fused_state, entropy)
+
+    state = EmotionRuntimeState(
+        user_text=user_text,
+        utterance_embedding=utterance_embedding,
+        emotion_vector=emotion_vector,
+        session_mood=session_mood,
+        user_style_embedding=list(emotion_context.get("user_style_embedding", [])),
+        user_style_projection=user_style_projection,
+        fused_state=fused_state,
+        entropy=entropy,
+        response_tone=tone,
+        cautious_language=bool(policy["cautious_language"]),
+        suggested_prefix=str(policy["suggested_prefix"]),
+        high_risk_override=bool(policy["high_risk_override"]),
+    )
+    return state.to_dict()

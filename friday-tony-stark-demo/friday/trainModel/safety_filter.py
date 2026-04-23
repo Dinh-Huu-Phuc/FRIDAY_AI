@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .config import TrainModelConfig, build_default_config
 from .schemas import ConversationSample, SafetyResult
 
 
@@ -19,7 +20,15 @@ class SafetyFilter:
     Rule-based filter that blocks low-quality or unsafe records before scoring.
     """
 
-    def __init__(self) -> None:
+    OVERCLAIMING_PATTERNS = (
+        re.compile(r"(?i)\byou are depressed\b"),
+        re.compile(r"(?i)\byou have anxiety disorder\b"),
+        re.compile(r"(?i)\bi know exactly how you feel\b"),
+        re.compile(r"(?i)\byou are mentally unstable\b"),
+    )
+
+    def __init__(self, config: TrainModelConfig | None = None) -> None:
+        self.config = config or build_default_config()
         self.error_rules = [
             SafetyRule(
                 name="traceback",
@@ -82,6 +91,15 @@ class SafetyFilter:
                     violations=[rule.name],
                 )
 
+        for pattern in self.OVERCLAIMING_PATTERNS:
+            if pattern.search(assistant_text):
+                return SafetyResult(
+                    safe=False,
+                    reason="Assistant response overclaims emotional certainty or diagnosis.",
+                    severity="high",
+                    violations=["emotion_overclaim"],
+                )
+
         if self._looks_like_spam(user_text, assistant_text):
             return SafetyResult(
                 safe=False,
@@ -91,6 +109,25 @@ class SafetyFilter:
             )
 
         return SafetyResult(safe=True, reason="Sample passed rule-based safety checks.", severity="low")
+
+    def apply_emotion_uncertainty_policy(
+        self,
+        *,
+        entropy: float,
+        high_risk: bool = False,
+    ) -> dict[str, object]:
+        cautious = entropy >= self.config.emotion_high_entropy_threshold or high_risk
+        prefix = ""
+        if high_risk:
+            prefix = "This may be serious, so respond carefully and prioritize higher-level safety handling."
+        elif cautious:
+            prefix = "I may be reading this imperfectly, but "
+        return {
+            "cautious_language": cautious,
+            "suggested_prefix": prefix,
+            "allow_emotion_reflection": not high_risk,
+            "high_risk_override": high_risk,
+        }
 
     def _looks_like_spam(self, user_text: str, assistant_text: str) -> bool:
         user_tokens = user_text.lower().split()
@@ -103,4 +140,3 @@ class SafetyFilter:
         return repeated_user_tokens > len(user_tokens) * 0.7 or repeated_assistant_tokens > len(
             assistant_tokens
         ) * 0.7
-

@@ -1,5 +1,11 @@
 DEV ĐINH HỮU PHÚC 
 
+# BANNER FIRDAY
+
+[Banner](G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo\friday\assets\img\tanthuyhoangdev.png)
+
+
+
 # F.R.I.D.A.Y. — Tony Stark Demo
 
 > *"Fully Responsive Intelligent Digital Assistant for You"*
@@ -46,8 +52,10 @@ The voice agent connects to the MCP server via SSE at `http://127.0.0.1:8000/sse
 
 ```
 friday-tony-stark-demo/
-├── server.py           # uv run friday  → starts the MCP server (SSE on :8000)
-├── agent_friday.py     # uv run friday_voice → starts the LiveKit voice agent
+├── server/
+│   ├── server.py       # uv run friday  → starts the MCP server (SSE on :8000)
+│   ├── agent_friday.py # uv run friday_voice → starts the LiveKit voice agent
+│   └── main.py
 ├── pyproject.toml
 ├── .env.example        # copy → .env and fill in your keys
 │
@@ -110,8 +118,8 @@ Starts the LiveKit voice agent in **dev mode** — it joins a LiveKit room and b
 
 | Command | Entry point | What it does |
 |---------|------------|--------------|
-| `uv run friday` | `server.py → main()` | Launches the **FastMCP server** over SSE transport on port 8000. This is the "brain backend" — it registers all tools, prompts, and resources that the LLM can call. |
-| `uv run friday_voice` | `agent_friday.py → dev()` | Launches the **LiveKit voice agent**. It builds the STT / LLM / TTS pipeline, connects to your LiveKit room, and wires up the MCP server as a tool source. The `dev()` wrapper auto-injects the `dev` CLI flag so you don't have to type it manually. |
+| `uv run friday` | `server/server.py → main()` | Launches the **FastMCP server** over SSE transport on port 8000. This is the "brain backend" — it registers all tools, prompts, and resources that the LLM can call. |
+| `uv run friday_voice` | `server/agent_friday.py → dev()` | Launches the **LiveKit voice agent**. It builds the STT / LLM / TTS pipeline, connects to your LiveKit room, and wires up the MCP server as a tool source. The `dev()` wrapper auto-injects the `dev` CLI flag so you don't have to type it manually. |
 
 > Both processes must run **simultaneously**. The voice agent calls the MCP server in real time whenever it needs a tool (e.g. fetching news).
 
@@ -139,7 +147,7 @@ Copy `.env.example` → `.env` and fill in the values below.
 
 ## Switching providers
 
-Open `agent_friday.py` and change the provider constants at the top:
+Open `server/agent_friday.py` and change the provider constants at the top:
 
 ```python
 STT_PROVIDER = "google"   # "google" | "deepgram" | "sarvam" | "whisper"

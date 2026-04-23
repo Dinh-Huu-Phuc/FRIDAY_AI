@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .config import TrainModelConfig
+from .emotion_math import EmotionHeuristicModel, compute_multi_label_metrics, parse_multi_label_targets
 from .schemas import TrainingExample, TrainingReport
 
 
@@ -48,9 +49,19 @@ class MockSFTBackend:
     ) -> dict[str, float]:
         quality_values = [float(item.metadata.get("quality_score", 0.5)) for item in train_examples]
         quality_mean = sum(quality_values) / max(len(quality_values), 1)
-        pass_rate = min(1.0, max(0.0, 0.55 + quality_mean * 0.4))
+        emotion_metrics = self._emotion_training_metrics(
+            train_examples=train_examples,
+            valid_examples=valid_examples,
+            test_examples=test_examples,
+            config=config,
+        )
+        macro_f1 = float(emotion_metrics.get("macro_f1", 0.0))
+        pass_rate = min(1.0, max(0.0, 0.45 + quality_mean * 0.3 + macro_f1 * 0.25))
 
-        train_loss = max(0.08, 1.15 - quality_mean * 0.9)
+        train_loss = max(
+            0.08,
+            1.15 - quality_mean * 0.9 + float(emotion_metrics.get("binary_cross_entropy", 0.0)) * 0.05,
+        )
         valid_loss = max(0.10, train_loss + 0.03)
         test_loss = max(0.10, valid_loss + 0.02)
 
@@ -72,7 +83,36 @@ class MockSFTBackend:
             "test_loss": round(test_loss, 6),
             "quality_mean": round(quality_mean, 6),
             "pass_rate": round(pass_rate, 6),
+            "precision": round(float(emotion_metrics.get("precision", 0.0)), 6),
+            "recall": round(float(emotion_metrics.get("recall", 0.0)), 6),
+            "f1": round(float(emotion_metrics.get("f1", 0.0)), 6),
+            "macro_f1": round(float(emotion_metrics.get("macro_f1", 0.0)), 6),
+            "micro_f1": round(float(emotion_metrics.get("micro_f1", 0.0)), 6),
+            "binary_cross_entropy": round(float(emotion_metrics.get("binary_cross_entropy", 0.0)), 6),
         }
+
+    def _emotion_training_metrics(
+        self,
+        *,
+        train_examples: list[TrainingExample],
+        valid_examples: list[TrainingExample],
+        test_examples: list[TrainingExample],
+        config: TrainModelConfig,
+    ) -> dict[str, float]:
+        dataset = list(train_examples) + list(valid_examples) + list(test_examples)
+        if not dataset:
+            return compute_multi_label_metrics([], [], labels=config.emotion_labels)
+
+        model = EmotionHeuristicModel(labels=list(config.emotion_labels))
+        predictions: list[dict[str, float]] = []
+        targets: list[dict[str, float]] = []
+        for example in dataset:
+            target_payload = dict(example.metadata or {}).get("emotion_targets")
+            if target_payload is None:
+                continue
+            predictions.append(model.predict_probabilities(example.instruction))
+            targets.append(parse_multi_label_targets(target_payload, labels=config.emotion_labels))
+        return compute_multi_label_metrics(predictions, targets, labels=config.emotion_labels)
 
 
 class Trainer:
@@ -157,4 +197,3 @@ class Trainer:
         self.config.ensure_directories()
         report_path = self.config.reports_dir / f"training_{report.run_id}.json"
         report_path.write_text(json.dumps(report.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
-
