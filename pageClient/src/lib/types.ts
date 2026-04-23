@@ -3,6 +3,7 @@ export type SafetyMode = "strict" | "moderate" | "off"
 export type ActionStatus = "success" | "blocked" | "failed" | "pending"
 export type LogLevel = "debug" | "info" | "warn" | "error"
 export type MessageRole = "user" | "assistant" | "system"
+export type ChatChannel = "text" | "voice"
 export type ActionType =
   | "click"
   | "double_click"
@@ -115,6 +116,7 @@ export interface ChatMessage {
   role: MessageRole
   content: string
   timestamp: string
+  channel?: ChatChannel
   status?: "sent" | "received" | "pending" | "error"
 }
 
@@ -142,6 +144,14 @@ export interface ConsoleSnapshot {
   latestPlan?: PlanResult | null
   latestExecution?: ExecuteResult | null
   backendStatus: BackendStatus
+}
+
+export interface ConnectionGreeting {
+  message: string
+  generatedAt: string
+  location: string
+  weatherSummary?: string | null
+  source: "api" | "mock"
 }
 
 export interface ComputerSnapshot {

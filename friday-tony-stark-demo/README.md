@@ -1,5 +1,11 @@
 DEV ĐINH HỮU PHÚC 
 
+# BANNER FIRDAY
+
+[Banner](G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo\friday\assets\img\tanthuyhoangdev.png)
+
+
+
 # F.R.I.D.A.Y. — Tony Stark Demo
 
 > *"Fully Responsive Intelligent Digital Assistant for You"*

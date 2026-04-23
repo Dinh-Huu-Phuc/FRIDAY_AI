@@ -6,12 +6,15 @@ import { Clock3, ListChecks, Logs, MonitorPlay } from "lucide-react"
 import { SummaryGrid } from "@/components/dashboard/summary-grid"
 import { PageShell } from "@/components/layout/page-shell"
 import { Badge } from "@/components/ui/badge"
+import { useBackendConnection } from "@/hooks/use-backend-connection"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getDashboardSnapshot } from "@/lib/runtime-api"
+import { resolveBackendStatus } from "@/lib/api"
+import { getDashboardSnapshot } from "@/lib/api/runtime"
 import type { DashboardSnapshot } from "@/lib/types"
 import { badgeTone, cn, compactPath, formatTimestamp, riskTone, statusTone, titleCase } from "@/lib/utils"
 
 export default function DashboardPage() {
+  const { isConnected } = useBackendConnection()
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -28,7 +31,7 @@ export default function DashboardPage() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [loadSnapshot])
+  }, [isConnected, loadSnapshot])
 
   if (loading || !snapshot) {
     return (
@@ -50,7 +53,7 @@ export default function DashboardPage() {
     <PageShell
       title="Dashboard"
       description="Overall system visibility for FIRDAY and the computer control agent."
-      backendStatus={snapshot.backendStatus}
+      backendStatus={resolveBackendStatus(snapshot.backendStatus.source)}
       safetyMode={snapshot.runtimeState.safetyMode}
     >
       <div className="space-y-6">

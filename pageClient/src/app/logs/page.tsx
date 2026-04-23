@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react"
 
 import { PageShell } from "@/components/layout/page-shell"
+import { useBackendConnection } from "@/hooks/use-backend-connection"
 import { LogsPanel } from "@/components/logs/logs-panel"
-import { getLogs } from "@/lib/runtime-api"
+import { getLogs } from "@/lib/api/runtime"
 import { resolveBackendStatus } from "@/lib/api"
 import type { LogEntry } from "@/lib/types"
 
 export default function LogsPage() {
+  const { isConnected } = useBackendConnection()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [source, setSource] = useState<"api" | "mock">("mock")
   const [loading, setLoading] = useState(true)
@@ -27,7 +29,7 @@ export default function LogsPage() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [loadLogs])
+  }, [isConnected, loadLogs])
 
   return (
     <PageShell

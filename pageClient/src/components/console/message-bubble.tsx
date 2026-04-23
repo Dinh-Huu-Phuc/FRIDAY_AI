@@ -1,6 +1,6 @@
 "use client"
 
-import { Bot, User } from "lucide-react"
+import { Bot, Keyboard, Mic, User } from "lucide-react"
 
 import type { ChatMessage } from "@/lib/types"
 import { cn, formatTimestamp } from "@/lib/utils"
@@ -11,6 +11,7 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user"
+  const isVoice = message.channel === "voice"
 
   return (
     <div
@@ -34,7 +35,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
       >
         <div className="mb-1 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
-          <span>{isUser ? "User" : "FIRDAY"}</span>
+          <div className="flex items-center gap-2">
+            <span>{isUser ? "User" : "FIRDAY"}</span>
+            <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] tracking-[0.14em] text-zinc-400">
+              {isVoice ? <Mic className="size-3" /> : <Keyboard className="size-3" />}
+              {isVoice ? "Voice" : "Text"}
+            </span>
+          </div>
           <span>{formatTimestamp(message.timestamp)}</span>
         </div>
         <p>{message.content}</p>

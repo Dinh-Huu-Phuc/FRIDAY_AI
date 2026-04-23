@@ -11,11 +11,9 @@ interface PageShellProps {
   backendStatus: BackendStatus
   safetyMode: SafetyMode
   busy?: boolean
-  showStop?: boolean
+  showConnectionToggle?: boolean
   onObserve?: () => void
   onPlan?: () => void
-  onRun?: () => void
-  onStop?: () => void
   children: ReactNode
 }
 

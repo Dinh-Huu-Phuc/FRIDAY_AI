@@ -110,4 +110,30 @@
   .terminal-panel {
     background-image: linear-gradient(to bottom, rgba(255,255,255,0.02), transparent);
   }
+
+  .audio-wave-bar[data-active="true"] {
+    animation: audio-wave-rise 1.15s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+
+  .agent-audio-grid {
+    background-color: #030608;
+    background-image:
+      radial-gradient(circle at center, rgba(34, 211, 238, 0.05), transparent 35%),
+      radial-gradient(rgba(255,255,255,0.08) 0.7px, transparent 0.7px);
+    background-size: 100% 100%, 22px 22px;
+    background-position: center, center;
+  }
+}
+
+@keyframes audio-wave-rise {
+  0%, 100% {
+    transform: scaleY(0.42);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }

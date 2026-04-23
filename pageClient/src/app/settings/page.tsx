@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { loadSettings, saveSettings } from "@/lib/runtime-api"
+import { loadSettings, saveSettings } from "@/lib/api/runtime"
 import type { SettingsState } from "@/lib/types"
 
 export default function SettingsPage() {
@@ -31,7 +31,7 @@ export default function SettingsPage() {
       description="Configure backend base URL and lightweight dashboard behavior."
       backendStatus={{ status: "mock", label: "Local Settings", detail: "Stored in browser localStorage.", source: "mock" }}
       safetyMode="strict"
-      showStop={false}
+      showConnectionToggle={false}
     >
       <Card className="max-w-3xl border-white/10 bg-white/[0.03]">
         <CardHeader>

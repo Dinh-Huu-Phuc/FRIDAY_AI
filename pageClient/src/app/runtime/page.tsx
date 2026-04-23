@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react"
 
 import { RuntimeStateCard } from "@/components/runtime/runtime-state-card"
 import { PageShell } from "@/components/layout/page-shell"
-import { getRuntimeState } from "@/lib/runtime-api"
+import { useBackendConnection } from "@/hooks/use-backend-connection"
+import { getRuntimeState } from "@/lib/api/runtime"
 import { resolveBackendStatus } from "@/lib/api"
 import type { RuntimeState } from "@/lib/types"
 
 export default function RuntimePage() {
+  const { isConnected } = useBackendConnection()
   const [runtime, setRuntime] = useState<RuntimeState | null>(null)
   const [source, setSource] = useState<"api" | "mock">("mock")
   const [loading, setLoading] = useState(true)
@@ -27,7 +29,7 @@ export default function RuntimePage() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [loadRuntime])
+  }, [isConnected, loadRuntime])
 
   if (loading || !runtime) {
     return (

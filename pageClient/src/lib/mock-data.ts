@@ -1,6 +1,7 @@
 import type {
   ActionHistoryItem,
   BackendStatus,
+  ChatChannel,
   ChatMessage,
   ComputerAction,
   ComputerObservation,
@@ -272,6 +273,7 @@ export function createMockMessages(): ChatMessage[] {
       role: "assistant",
       content: "FIRDAY dashboard online. Backend is reachable, and computer safety mode is strict.",
       timestamp: isoMinutesAgo(20),
+      channel: "text",
       status: "received",
     },
     {
@@ -279,6 +281,7 @@ export function createMockMessages(): ChatMessage[] {
       role: "user",
       content: "Observe the current screen and tell me the safest next step.",
       timestamp: isoMinutesAgo(14),
+      channel: "text",
       status: "sent",
     },
     {
@@ -286,6 +289,7 @@ export function createMockMessages(): ChatMessage[] {
       role: "assistant",
       content: "Observation complete. VS Code is focused, terminal is visible, and the safest next step is a single click on the active editor tab.",
       timestamp: isoMinutesAgo(13),
+      channel: "text",
       status: "received",
     },
     {
@@ -293,6 +297,7 @@ export function createMockMessages(): ChatMessage[] {
       role: "user",
       content: "Run one cycle for the current task.",
       timestamp: isoMinutesAgo(2),
+      channel: "voice",
       status: "sent",
     },
     {
@@ -300,6 +305,7 @@ export function createMockMessages(): ChatMessage[] {
       role: "assistant",
       content: "Cycle complete. One click action executed successfully and runtime context has been updated.",
       timestamp: isoMinutesAgo(1),
+      channel: "voice",
       status: "received",
     },
   ]
@@ -370,12 +376,16 @@ export function createMockSettings(): SettingsState {
   }
 }
 
-export function createMockChatReply(input: string): ChatMessage {
+export function createMockChatReply(
+  input: string,
+  channel: ChatChannel = "text"
+): ChatMessage {
   return {
     id: `reply-${Date.now()}`,
     role: "assistant",
     content: `Received command: "${input}". FIRDAY would observe the screen, plan one safe step, validate it, and report the result here.`,
     timestamp: new Date().toISOString(),
+    channel,
     status: "received",
   }
 }

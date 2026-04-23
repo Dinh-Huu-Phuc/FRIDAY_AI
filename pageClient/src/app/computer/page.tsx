@@ -8,20 +8,25 @@ import { PlannedActionCard } from "@/components/computer/planned-action-card"
 import { RuntimeMiniCard } from "@/components/computer/runtime-mini-card"
 import { ScreenshotCard } from "@/components/computer/screenshot-card"
 import { PageShell } from "@/components/layout/page-shell"
+import { useBackendConnection } from "@/hooks/use-backend-connection"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { resolveBackendStatus } from "@/lib/api"
 import {
   executeComputer,
   observeComputer,
   planComputer,
   runComputerCycle,
-} from "@/lib/computer-api"
-import { createMockActionHistory } from "@/lib/mock-data"
-import { getComputerSnapshot } from "@/lib/runtime-api"
+} from "@/lib/api/computer"
+import { getComputerSnapshot } from "@/lib/api/runtime"
+import {
+  createMockActionHistory,
+} from "@/lib/mock-data"
 import type { ActionHistoryItem, ComputerSnapshot, ExecuteResult, PlanResult } from "@/lib/types"
 
 type LoadingAction = "observe" | "plan" | "execute" | "run" | null
 
 export default function ComputerPage() {
+  const { isConnected } = useBackendConnection()
   const [snapshot, setSnapshot] = useState<ComputerSnapshot | null>(null)
   const [goal, setGoal] = useState("")
   const [loading, setLoading] = useState(true)
@@ -43,7 +48,7 @@ export default function ComputerPage() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [loadSnapshot])
+  }, [isConnected, loadSnapshot])
 
   const actionHistory = useMemo(
     () => snapshot?.actionHistory ?? createMockActionHistory(),
@@ -219,12 +224,11 @@ export default function ComputerPage() {
     <PageShell
       title="Computer Control"
       description="Observe the screen, plan one safe next step, execute it, and monitor the result history."
-      backendStatus={snapshot.backendStatus}
+      backendStatus={resolveBackendStatus(snapshot.backendStatus.source)}
       safetyMode={snapshot.runtimeState.safetyMode}
       busy={loadingAction !== null}
       onObserve={handleObserve}
       onPlan={handlePlan}
-      onRun={handleRun}
     >
       <div className="space-y-6">
         {inlineError ? (

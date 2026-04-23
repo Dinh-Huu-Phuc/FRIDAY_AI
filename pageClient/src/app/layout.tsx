@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { GlobalConnectionReport } from "@/components/layout/global-connection-report";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import "./globals.css";
 
@@ -19,7 +20,10 @@ export default function RootLayout({
         <TooltipProvider>
           <div className="flex min-h-screen bg-[#0b0f14] text-zinc-50">
             <AppSidebar />
-            <div className="flex min-h-screen flex-1 flex-col">{children}</div>
+            <div className="flex min-h-screen flex-1 flex-col">
+              <GlobalConnectionReport />
+              {children}
+            </div>
           </div>
         </TooltipProvider>
       </body>

@@ -1,18 +1,21 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, Play, Shield, Square, Wand2 } from "lucide-react"
+import { Eye, Shield, Wifi, WifiOff, Wand2 } from "lucide-react"
 
+import { useBackendConnection } from "@/hooks/use-backend-connection"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { probeBackendConnection } from "@/lib/api"
+import { getConnectionGreeting } from "@/lib/api/runtime"
+import { clearConnectionGreetingState, setConnectionGreetingState } from "@/lib/session/connection-greeting-store"
 import type { BackendStatus, SafetyMode } from "@/lib/types"
 import { badgeTone, cn, statusTone, titleCase } from "@/lib/utils"
 
 interface QuickActions {
   onObserve?: () => void
   onPlan?: () => void
-  onRun?: () => void
-  onStop?: () => void
 }
 
 interface AppHeaderProps extends QuickActions {
@@ -21,7 +24,7 @@ interface AppHeaderProps extends QuickActions {
   backendStatus: BackendStatus
   safetyMode: SafetyMode
   busy?: boolean
-  showStop?: boolean
+  showConnectionToggle?: boolean
 }
 
 export function AppHeader({
@@ -30,16 +33,37 @@ export function AppHeader({
   backendStatus,
   safetyMode,
   busy,
-  showStop = true,
+  showConnectionToggle = true,
   onObserve,
   onPlan,
-  onRun,
-  onStop,
 }: AppHeaderProps) {
   const router = useRouter()
+  const { isConnected, connect, disconnect } = useBackendConnection()
+  const [connectionBusy, setConnectionBusy] = useState(false)
 
   const goToComputer = (action: string) => {
     router.push(`/computer?action=${action}`)
+  }
+
+  async function handleConnectionToggle() {
+    if (isConnected) {
+      disconnect()
+      clearConnectionGreetingState()
+      return
+    }
+
+    setConnectionBusy(true)
+    try {
+      const canConnect = await probeBackendConnection()
+
+      if (canConnect) {
+        connect()
+        const greetingResult = await getConnectionGreeting()
+        setConnectionGreetingState(greetingResult.data)
+      }
+    } finally {
+      setConnectionBusy(false)
+    }
   }
 
   return (
@@ -92,18 +116,14 @@ export function AppHeader({
               <Wand2 />
               Plan
             </Button>
-            <Button disabled={busy} onClick={onRun ?? (() => goToComputer("run"))}>
-              <Play />
-              Run
-            </Button>
-            {showStop ? (
+            {showConnectionToggle ? (
               <Button
-                variant="destructive"
-                disabled={!onStop || busy}
-                onClick={onStop}
+                variant={isConnected ? "destructive" : "default"}
+                disabled={connectionBusy}
+                onClick={handleConnectionToggle}
               >
-                <Square />
-                Stop
+                {isConnected ? <WifiOff /> : <Wifi />}
+                {connectionBusy ? "Connecting..." : isConnected ? "Disconnect" : "Connect"}
               </Button>
             ) : null}
           </div>
