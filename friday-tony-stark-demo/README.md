@@ -2,7 +2,7 @@ DEV ĐINH HỮU PHÚC
 
 # BANNER FIRDAY
 
-[Banner](G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo\friday\assets\img\tanthuyhoangdev.png)
+![Banner FIRDAY](friday/assets/img/tanthuyhoangdev.png)
 
 
 
