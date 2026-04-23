@@ -182,3 +182,24 @@ class EmotionRuntimeState:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class NormalizedDatasetRow:
+    id: str
+    user_id: str
+    session_id: str
+    timestamp: float
+    source: str
+    input_text: str
+    target_text: str
+    emotion_labels: list[str] = field(default_factory=list)
+    emotion_scores: dict[str, float] = field(default_factory=dict)
+    intent: str = ""
+    memory_tags: list[str] = field(default_factory=list)
+    quality_score: float = 0.0
+    is_safe: bool = True
+    notes: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

@@ -76,6 +76,7 @@ def run_training_pipeline(
     store = ConversationDatasetStore(cfg)
 
     try:
+        source_dataset_result = dataset_builder.build_from_sources(export_xlsx=False)
         raw_samples = collector.collect()
         raw_dump_path = collector.dump_raw_samples(raw_samples)
 
@@ -125,6 +126,7 @@ def run_training_pipeline(
                     "cleaned_path": str(cleaned_path),
                     "candidate_path": str(candidate_path),
                     "rejected_path": str(rejected_path),
+                    "source_dataset_result": source_dataset_result,
                 },
             )
             _write_pipeline_report(cfg, result)
@@ -188,6 +190,7 @@ def run_training_pipeline(
                 "candidate_path": str(candidate_path),
                 "rejected_path": str(rejected_path),
                 "curated_candidates_path": dataset_result.curated_candidates_path,
+                "source_dataset_result": source_dataset_result,
             },
             training_report=training_report.to_dict(),
             evaluation_report=evaluation_report.to_dict(),

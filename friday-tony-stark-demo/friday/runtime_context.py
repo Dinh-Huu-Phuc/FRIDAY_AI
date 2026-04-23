@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any
 
+from friday.language.constants import DEFAULT_LANGUAGE
+
 DEVICE_MODEL = "ASUS TUF Gaming F15 FX506LI"
 DEFAULT_LOCATION_CITY = "Da Lat"
 DEFAULT_LOCATION_COUNTRY = "Vietnam"
@@ -55,6 +57,7 @@ class ComputerRuntimeContext:
     screen_width: int = 0
     screen_height: int = 0
     safety_mode: str = DEFAULT_COMPUTER_SAFETY_MODE
+    current_language: str = DEFAULT_LANGUAGE
 
 
 _COMPUTER_RUNTIME_LOCK = Lock()
@@ -87,6 +90,7 @@ def _snapshot_computer_runtime_context() -> dict[str, Any]:
         "screen_width": _COMPUTER_RUNTIME_CONTEXT.screen_width,
         "screen_height": _COMPUTER_RUNTIME_CONTEXT.screen_height,
         "safety_mode": _COMPUTER_RUNTIME_CONTEXT.safety_mode,
+        "current_language": _COMPUTER_RUNTIME_CONTEXT.current_language,
     }
 
 
@@ -121,6 +125,7 @@ def reset_computer_runtime_context() -> dict[str, Any]:
         _COMPUTER_RUNTIME_CONTEXT.screen_width = 0
         _COMPUTER_RUNTIME_CONTEXT.screen_height = 0
         _COMPUTER_RUNTIME_CONTEXT.safety_mode = DEFAULT_COMPUTER_SAFETY_MODE
+        _COMPUTER_RUNTIME_CONTEXT.current_language = DEFAULT_LANGUAGE
         return _snapshot_computer_runtime_context()
 
 

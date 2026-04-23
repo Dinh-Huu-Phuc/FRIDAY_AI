@@ -11,6 +11,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 
 from friday.app.computer.exceptions import ComputerError
+from friday.app.agent_console import get_console_greeting, get_console_snapshot, send_console_message
+from friday.app.agent_console.schemas import ConsoleChatRequest
 from friday.app.computer.router.routes import execute_computer_action, observe_computer, plan_computer, run_computer_cycle
 from friday.app.computer.schemas.requests import ExecuteRequest, ObserveRequest, PlanRequest, RunRequest
 from friday.app.facebook.exceptions import (
@@ -162,6 +164,28 @@ async def computer_run(request: Request) -> Response:
         return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
 
     return JSONResponse(response.model_dump(by_alias=True, mode="json"), status_code=200)
+
+
+@mcp.custom_route("/agent/console", methods=["GET"], name="agent-console")
+async def agent_console(_: Request) -> Response:
+    return JSONResponse(get_console_snapshot(), status_code=200)
+
+
+@mcp.custom_route("/agent/chat", methods=["POST"], name="agent-chat")
+async def agent_chat(request: Request) -> Response:
+    try:
+        response = send_console_message(await _load_model(request, ConsoleChatRequest))
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    except ValidationError as exc:
+        return JSONResponse({"ok": False, "message": "Invalid chat payload.", "details": exc.errors()}, status_code=422)
+
+    return JSONResponse(response, status_code=200)
+
+
+@mcp.custom_route("/agent/greeting", methods=["GET"], name="agent-greeting")
+async def agent_greeting(_: Request) -> Response:
+    return JSONResponse(await get_console_greeting(), status_code=200)
 
 
 def main() -> None:
