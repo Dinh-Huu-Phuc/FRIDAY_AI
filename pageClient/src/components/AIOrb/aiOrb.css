@@ -1,0 +1,130 @@
+.ai-orb {
+  --ai-orb-size: 320px;
+  position: relative;
+  inline-size: min(var(--ai-orb-size), 76vw);
+  block-size: min(var(--ai-orb-size), 76vw);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  filter: drop-shadow(0 0 34px rgba(34, 211, 238, 0.22));
+}
+
+.ai-orb::before {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(125, 211, 252, 0.2), transparent 58%),
+    conic-gradient(from 180deg, transparent, rgba(34, 211, 238, 0.2), transparent, rgba(37, 99, 235, 0.22), transparent);
+  opacity: 0.7;
+  filter: blur(18px);
+  transform: scale(0.92);
+  z-index: -2;
+}
+
+.ai-orb__canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  inline-size: 100% !important;
+  block-size: 100% !important;
+  max-inline-size: 100%;
+  max-block-size: 100%;
+}
+
+.ai-orb__halo {
+  position: absolute;
+  inset: 5%;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.08);
+  background:
+    radial-gradient(circle at center, rgba(103, 232, 249, 0.12), transparent 36%),
+    repeating-radial-gradient(circle at center, rgba(34, 211, 238, 0.12) 0 1px, transparent 1px 14px);
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ai-orb[data-state="idle"] {
+  filter: drop-shadow(0 0 26px rgba(34, 211, 238, 0.16));
+}
+
+.ai-orb[data-state="listening"] {
+  filter: drop-shadow(0 0 40px rgba(45, 212, 191, 0.3));
+}
+
+.ai-orb[data-state="listening"] .ai-orb__halo {
+  animation: ai-orb-ripple 1.55s ease-in-out infinite;
+}
+
+.ai-orb[data-state="thinking"] {
+  filter: drop-shadow(0 0 48px rgba(14, 165, 233, 0.36));
+}
+
+.ai-orb[data-state="thinking"]::before {
+  animation: ai-orb-scan 1.8s linear infinite;
+}
+
+.ai-orb[data-state="speaking"] {
+  filter: drop-shadow(0 0 58px rgba(34, 211, 238, 0.45));
+}
+
+.ai-orb[data-state="speaking"] .ai-orb__halo {
+  opacity: 0.62;
+  animation: ai-orb-speak 0.82s ease-in-out infinite;
+}
+
+.ai-orb[data-state="error"] {
+  filter: drop-shadow(0 0 46px rgba(251, 113, 133, 0.24)) drop-shadow(0 0 30px rgba(34, 211, 238, 0.2));
+  animation: ai-orb-error-shake 0.42s ease-in-out infinite;
+}
+
+@keyframes ai-orb-ripple {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scale(0.94);
+  }
+
+  50% {
+    opacity: 0.64;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes ai-orb-scan {
+  to {
+    transform: rotate(360deg) scale(0.96);
+  }
+}
+
+@keyframes ai-orb-speak {
+  0%,
+  100% {
+    transform: scale(0.96);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes ai-orb-error-shake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(1.5px, -1px, 0);
+  }
+}
+
+@media (max-width: 640px) {
+  .ai-orb {
+    inline-size: min(var(--ai-orb-size), 260px, 82vw);
+    block-size: min(var(--ai-orb-size), 260px, 82vw);
+  }
+}
