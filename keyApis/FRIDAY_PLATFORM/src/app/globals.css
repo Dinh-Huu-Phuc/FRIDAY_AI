@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "../themes/friday-platform.css";
+
+@layer base {
+  :root {
+    --background: 229 54% 6%;
+    --foreground: 210 40% 98%;
+    --card: 228 34% 10%;
+    --card-foreground: 210 40% 98%;
+    --primary: 189 94% 58%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 228 28% 16%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 229 24% 16%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 244 75% 65%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 18% 24%;
+    --input: 220 18% 24%;
+    --ring: 189 94% 58%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+    background: #050816;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}

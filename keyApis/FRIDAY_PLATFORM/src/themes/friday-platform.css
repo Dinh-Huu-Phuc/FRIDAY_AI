@@ -1,0 +1,246 @@
+.friday-grid {
+  background:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 28rem),
+    radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 26rem),
+    #050816;
+  background-size: 36px 36px, 36px 36px, auto, auto, auto;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
+}
+
+.glow-border {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 0 36px rgba(56,189,248,0.12);
+}
+
+.masked-secret {
+  border: 1px solid rgba(103, 232, 249, 0.2);
+  background: rgba(8, 13, 35, 0.82);
+  color: #a7f3d0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.code-block {
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(3, 7, 18, 0.84);
+  color: #dbeafe;
+}
+
+.friday-auth-stage {
+  background: #030712;
+}
+
+.friday-platform-stage {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(34, 211, 238, 0.12), transparent 26rem),
+    radial-gradient(circle at 88% 20%, rgba(168, 85, 247, 0.11), transparent 28rem),
+    #050816;
+}
+
+.friday-auth-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.42;
+  filter: saturate(1.12) contrast(1.08);
+}
+
+.friday-auth-overlay {
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(3, 7, 18, 0.9) 0%, rgba(5, 8, 22, 0.72) 45%, rgba(3, 7, 18, 0.88) 100%),
+    radial-gradient(circle at 20% 22%, rgba(34, 211, 238, 0.24), transparent 28rem),
+    radial-gradient(circle at 76% 64%, rgba(168, 85, 247, 0.2), transparent 28rem);
+}
+
+.friday-auth-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(103, 232, 249, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(103, 232, 249, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+}
+
+.friday-auth-scanline {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  opacity: 0.12;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,255,255,0.22) 1px, transparent 1px, transparent 5px);
+}
+
+.friday-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255,255,255,0.13);
+  background: rgba(8, 12, 30, 0.58);
+  color: #dbeafe;
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.78rem;
+  backdrop-filter: blur(16px);
+}
+
+.friday-auth-metric {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(8, 12, 30, 0.52);
+  border-radius: 0.75rem;
+  padding: 0.9rem;
+  backdrop-filter: blur(14px);
+}
+
+.friday-auth-metric span {
+  display: block;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.friday-auth-metric strong {
+  display: block;
+  margin-top: 0.45rem;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.friday-auth-card {
+  background: rgba(8, 12, 30, 0.72);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 24px 90px rgba(0,0,0,0.45),
+    0 0 48px rgba(34, 211, 238, 0.14),
+    0 0 80px rgba(168, 85, 247, 0.1);
+  backdrop-filter: blur(22px);
+}
+
+.friday-auth-tabs {
+  background: rgba(255,255,255,0.055);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.friday-auth-form-swap {
+  animation: fridayFormIn 180ms ease-out;
+}
+
+.friday-gradient-button {
+  background: linear-gradient(135deg, #67e8f9 0%, #3b82f6 48%, #a855f7 100%);
+  color: #020617;
+  box-shadow: 0 12px 36px rgba(56, 189, 248, 0.22);
+}
+
+.friday-gradient-button:hover {
+  filter: brightness(1.08);
+}
+
+@keyframes fridayFormIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .friday-auth-video {
+    opacity: 0.3;
+  }
+}
+
+.friday-public-hero {
+  isolation: isolate;
+}
+
+.friday-hero-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #030712;
+}
+
+.friday-hero-bg-compact {
+  position: fixed;
+}
+
+.friday-hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+  filter: saturate(1.15) contrast(1.1);
+}
+
+.friday-particle-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.65;
+}
+
+.friday-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(3, 7, 18, 0.94), rgba(5, 8, 22, 0.72) 48%, rgba(3, 7, 18, 0.9)),
+    radial-gradient(circle at 24% 35%, rgba(34, 211, 238, 0.22), transparent 28rem),
+    radial-gradient(circle at 82% 62%, rgba(168, 85, 247, 0.2), transparent 24rem);
+}
+
+.friday-hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(103, 232, 249, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(103, 232, 249, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 86%);
+}
+
+.friday-hero-scanline {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(255,255,255,0.2) 1px, transparent 1px, transparent 6px);
+}
+
+.friday-orbit-card {
+  position: relative;
+  height: 34rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(8,12,30,0.58);
+  box-shadow: 0 32px 110px rgba(34, 211, 238, 0.12), inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(18px);
+}
+
+.friday-feature-card {
+  background: rgba(8, 12, 30, 0.66);
+  border-color: rgba(255,255,255,0.12);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.friday-feature-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(103, 232, 249, 0.32);
+  box-shadow: 0 24px 70px rgba(34, 211, 238, 0.1);
+}
