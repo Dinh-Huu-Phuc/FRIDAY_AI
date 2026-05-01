@@ -53,7 +53,7 @@ class YouTubeClient:
                 "url": build_resource_url(
                     self.settings.website_url,
                     "video",
-                    f"{content_resource}-{index}-{query_token}",
+                    f"video-{index}-{query_token}",
                 ),
                 "label": f"YouTube Video {index}",
                 "description": f"Search result for '{request.query}'.",

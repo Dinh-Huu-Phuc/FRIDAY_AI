@@ -53,7 +53,7 @@ class XClient:
                 "url": build_resource_url(
                     self.settings.website_url,
                     "tweet",
-                    f"{content_resource}-{index}-{query_token}",
+                    f"tweet-{index}-{query_token}",
                 ),
                 "label": f"X Tweet {index}",
                 "description": f"Search result for '{request.query}'.",

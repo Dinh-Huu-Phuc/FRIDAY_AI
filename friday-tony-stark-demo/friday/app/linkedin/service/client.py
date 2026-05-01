@@ -53,7 +53,7 @@ class LinkedInClient:
                 "url": build_resource_url(
                     self.settings.website_url,
                     "post",
-                    f"{content_resource}-{index}-{query_token}",
+                    f"post-{index}-{query_token}",
                 ),
                 "label": f"LinkedIn Post {index}",
                 "description": f"Search result for '{request.query}'.",
