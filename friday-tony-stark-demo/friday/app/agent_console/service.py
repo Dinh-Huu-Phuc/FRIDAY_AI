@@ -88,6 +88,65 @@ class AgentConsoleService:
                 runtime_override=reply.get("runtime_state"),
             )
 
+    def send_assistant_reply(
+        self,
+        request: ConsoleChatRequest,
+        *,
+        assistant_content: str,
+        runtime_override: dict[str, Any] | None = None,
+        latest_plan: dict[str, Any] | None = None,
+        latest_execution: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        normalized_message = request.message.strip()
+        if not normalized_message:
+            raise ValueError("Message must not be empty.")
+
+        with self._lock:
+            state = self._load_state(session_id=request.session_id)
+
+            user_message = ConsoleMessage(
+                id=f"user-{uuid.uuid4().hex[:10]}",
+                role="user",
+                content=normalized_message,
+                channel=request.channel,
+                status="sent",
+            )
+            assistant_message = ConsoleMessage(
+                id=f"assistant-{uuid.uuid4().hex[:10]}",
+                role="assistant",
+                content=assistant_content,
+                channel=request.channel,
+                status="received",
+            )
+
+            state.messages.append(user_message)
+            state.messages.append(assistant_message)
+            state.latest_plan = latest_plan
+            state.latest_execution = latest_execution
+            state.updated_at = _now_iso()
+            state.messages = state.messages[-80:]
+
+            self._save_state(state)
+            self._append_turn_log(
+                session_id=request.session_id,
+                channel=request.channel,
+                user_message=user_message,
+                assistant_message=assistant_message,
+                latest_plan=state.latest_plan,
+                latest_execution=state.latest_execution,
+            )
+            self._append_training_turn(
+                session_id=request.session_id,
+                channel=request.channel,
+                user_message=user_message.content,
+                assistant_message=assistant_message.content,
+            )
+
+            return self._build_snapshot_payload(
+                state,
+                runtime_override=runtime_override,
+            )
+
     def _load_state(self, *, session_id: str) -> ConsoleState:
         if self._state_path.exists():
             try:

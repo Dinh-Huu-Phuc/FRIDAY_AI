@@ -53,7 +53,7 @@ class TikTokClient:
                 "url": build_resource_url(
                     self.settings.website_url,
                     "video",
-                    f"{content_resource}-{index}-{query_token}",
+                    f"video-{index}-{query_token}",
                 ),
                 "label": f"TikTok Video {index}",
                 "description": f"Search result for '{request.query}'.",

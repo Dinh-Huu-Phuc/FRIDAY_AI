@@ -53,7 +53,7 @@ class PinterestClient:
                 "url": build_resource_url(
                     self.settings.website_url,
                     "pin",
-                    f"{content_resource}-{index}-{query_token}",
+                    f"pin-{index}-{query_token}",
                 ),
                 "label": f"Pinterest Pin {index}",
                 "description": f"Search result for '{request.query}'.",

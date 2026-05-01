@@ -53,7 +53,7 @@ class DiscordClient:
                 "url": build_resource_url(
                     self.settings.website_url,
                     "message",
-                    f"{content_resource}-{index}-{query_token}",
+                    f"message-{index}-{query_token}",
                 ),
                 "label": f"Discord Message {index}",
                 "description": f"Search result for '{request.query}'.",
