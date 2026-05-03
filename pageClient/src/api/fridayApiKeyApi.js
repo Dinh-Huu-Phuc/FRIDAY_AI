@@ -39,6 +39,10 @@ export function getFridayApiKeyStatus() {
   return request("/api/friday-key/status")
 }
 
+export function listFridayApiKeys() {
+  return request("/api/friday-key/list")
+}
+
 export function disconnectFridayApiKey() {
   return request("/api/friday-key/disconnect", { method: "POST" })
 }

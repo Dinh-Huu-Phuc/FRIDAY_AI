@@ -49,7 +49,11 @@ export function LoginForm({ onSubmit, loading }) {
         {errors.password ? <p className="text-xs text-rose-300">{errors.password}</p> : null}
       </div>
 
-      <Button className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400" disabled={loading}>
+      <Button
+        type="submit"
+        className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+        disabled={loading}
+      >
         {loading ? "Signing in..." : "Login"}
       </Button>
     </form>

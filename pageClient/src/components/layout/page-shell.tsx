@@ -19,9 +19,9 @@ interface PageShellProps {
 
 export function PageShell({ children, ...headerProps }: PageShellProps) {
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-[#0b0f14]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#0b0f14]">
       <AppHeader {...headerProps} />
-      <main className="flex-1 p-4 sm:p-6">{children}</main>
+      <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
     </div>
   )
 }

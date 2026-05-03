@@ -131,3 +131,7 @@ async def chat(payload: ConsoleChatRequest) -> dict:
 
 async def greeting() -> dict:
     return await get_console_greeting()
+
+
+def console() -> dict:
+    return get_agent_console_service().get_snapshot()

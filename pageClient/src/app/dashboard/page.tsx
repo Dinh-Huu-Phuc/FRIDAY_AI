@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Clock3, ListChecks, Logs, MonitorPlay } from "lucide-react"
 
+import { DashboardHero } from "@/components/dashboard/dashboard-hero"
 import { SummaryGrid } from "@/components/dashboard/summary-grid"
 import { PageShell } from "@/components/layout/page-shell"
 import { Badge } from "@/components/ui/badge"
@@ -57,6 +58,8 @@ export default function DashboardPage() {
       safetyMode={snapshot.runtimeState.safetyMode}
     >
       <div className="space-y-6">
+        <DashboardHero />
+
         <SummaryGrid snapshot={snapshot} />
 
         <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
 const DEFAULT_BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001"
+const API_PREFIX = "/api/v1"
 
 function resolveBackendBaseUrl(request: NextRequest) {
   const headerValue = request.headers.get("x-backend-base-url")?.trim()
@@ -13,9 +14,9 @@ function resolveBackendBaseUrl(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const backendBaseUrl = resolveBackendBaseUrl(request)
   const candidateUrls = [
-    `${backendBaseUrl}/computer/observe`,
-    `${backendBaseUrl}/computer/plan`,
-    `${backendBaseUrl}/computer/run`,
+    `${backendBaseUrl}${API_PREFIX}/computer/observe`,
+    `${backendBaseUrl}${API_PREFIX}/computer/plan`,
+    `${backendBaseUrl}${API_PREFIX}/computer/run`,
   ]
 
   for (const candidateUrl of candidateUrls) {

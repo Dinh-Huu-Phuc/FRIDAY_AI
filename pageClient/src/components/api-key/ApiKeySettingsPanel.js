@@ -9,7 +9,7 @@ import { useState } from "react"
 
 export function ApiKeySettingsPanel() {
   const { isAuthenticated, user } = useAuth()
-  const { keyStatus, connected, connectKey, disconnectKey } = useFridayApiKey()
+  const { keyStatus, savedKeys, connected, connectKey, disconnectKey } = useFridayApiKey()
   const [open, setOpen] = useState(false)
 
   return (
@@ -31,6 +31,39 @@ export function ApiKeySettingsPanel() {
           ) : null}
         </div>
 
+        <div className="rounded-xl border border-white/10 bg-[#0f1419] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100">
+              Saved keys
+            </p>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-xs text-zinc-400">
+              {savedKeys.length}
+            </span>
+          </div>
+          {!savedKeys.length ? (
+            <p className="text-sm text-zinc-400">
+              No keys are available for this account yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {savedKeys.map((key) => (
+                <div
+                  key={key.id || key.keyId || key.preview}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-zinc-100">{key.name}</p>
+                    <p className="font-mono text-xs text-cyan-100">{key.preview}</p>
+                  </div>
+                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-xs text-cyan-100">
+                    {keyStatus?.preview === key.preview ? "Connected" : key.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => setOpen(true)}>
             {connected ? "Replace Key" : "Connect API Key"}
@@ -47,6 +80,8 @@ export function ApiKeySettingsPanel() {
           onClose={() => setOpen(false)}
           isAuthenticated={isAuthenticated}
           onConnected={connectKey}
+          savedKeys={savedKeys}
+          connectedKey={keyStatus}
         />
       </CardContent>
     </Card>

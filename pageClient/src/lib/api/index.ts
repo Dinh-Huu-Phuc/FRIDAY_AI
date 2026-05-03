@@ -4,7 +4,7 @@ import type { ApiResult } from "@/lib/types"
 
 const DEFAULT_TIMEOUT_MS = 6000
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001"
 const BACKEND_PROXY_PREFIX = "/api/backend"
 const BACKEND_PROBE_PATH = "/api/backend/probe"
 const SUPPORTED_BACKEND_PATHS = new Set([

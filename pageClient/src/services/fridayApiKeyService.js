@@ -8,6 +8,10 @@ export function getConnectedKeyStatus() {
   return fridayApiKeyApi.getFridayApiKeyStatus()
 }
 
+export function listKeys() {
+  return fridayApiKeyApi.listFridayApiKeys()
+}
+
 export function disconnectKey() {
   return fridayApiKeyApi.disconnectFridayApiKey()
 }

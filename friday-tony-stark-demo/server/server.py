@@ -5,6 +5,8 @@ Run with: python server/server.py
 
 import json
 
+import anyio
+import uvicorn
 from mcp.server.fastmcp import FastMCP
 from pydantic import ValidationError
 from starlette.requests import Request
@@ -188,8 +190,21 @@ async def agent_greeting(_: Request) -> Response:
     return JSONResponse(await get_console_greeting(), status_code=200)
 
 
+async def _run_sse() -> None:
+    app = mcp.sse_app()
+    config = uvicorn.Config(
+        app,
+        host=mcp.settings.host,
+        port=mcp.settings.port,
+        log_level=mcp.settings.log_level.lower(),
+        http="h11",
+    )
+    server = uvicorn.Server(config)
+    await server.serve()
+
+
 def main() -> None:
-    mcp.run(transport="sse")
+    anyio.run(_run_sse)
 
 
 if __name__ == "__main__":

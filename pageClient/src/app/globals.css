@@ -124,6 +124,27 @@
     background-size: 100% 100%, 22px 22px;
     background-position: center, center;
   }
+
+  .hero-gradient-text {
+    background: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.76) 42%, rgba(255,255,255,0.42) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .glass-btn-hover {
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      background-color 180ms ease,
+      opacity 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .glass-btn-hover:hover {
+    box-shadow: 0 18px 44px rgba(255,255,255,0.12);
+    transform: translateY(-1px);
+  }
 }
 
 @keyframes audio-wave-rise {

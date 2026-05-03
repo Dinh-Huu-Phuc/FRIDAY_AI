@@ -1,5 +1,5 @@
 export const apiConfig = {
-  backendUrl: process.env.BACKEND_URL || "http://localhost:8000",
+  backendUrl: process.env.BACKEND_URL || "http://localhost:8001",
   paths: {
     register: process.env.BACKEND_REGISTER_PATH || "/api/v1/auth/register",
     login: process.env.BACKEND_LOGIN_PATH || "/api/v1/auth/login",
