@@ -6,13 +6,19 @@ from sqlalchemy.orm import Session
 from friday.src.dependencies.auth import require_active_user
 from friday.src.dependencies.database import get_db
 from friday.src.models.user import User
-from friday.src.schemas.api_keys.requests import ApiKeyCreateRequest
-from friday.src.schemas.api_keys.responses import ApiKeyCreateResponse, ApiKeyMetadataResponse, ApiKeyRevokeResponse
+from friday.src.schemas.api_keys.requests import ApiKeyCreateRequest, ApiKeyVerifyRequest
+from friday.src.schemas.api_keys.responses import (
+    ApiKeyCreateResponse,
+    ApiKeyMetadataResponse,
+    ApiKeyRevokeResponse,
+    ApiKeyVerifyResponse,
+)
 from friday.src.services.api_keys.service import (
     create_internal_api_key,
     get_internal_api_key,
     list_internal_api_keys,
     revoke_internal_api_key,
+    verify_internal_api_key,
 )
 
 
@@ -36,6 +42,15 @@ def list_keys(
     db: Session = Depends(get_db),
 ) -> list[ApiKeyMetadataResponse]:
     return list_internal_api_keys(db, current_user, limit=limit, offset=offset)
+
+
+@router.post("/verify", response_model=ApiKeyVerifyResponse)
+def verify_key(
+    payload: ApiKeyVerifyRequest,
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> ApiKeyVerifyResponse:
+    return ApiKeyVerifyResponse(api_key=verify_internal_api_key(db, payload.api_key, current_user))
 
 
 @router.get("/{key_id}", response_model=ApiKeyMetadataResponse)

@@ -25,7 +25,10 @@ export function useAuth() {
   }, [])
 
   useEffect(() => {
-    void refreshMe()
+    const timer = window.setTimeout(() => {
+      void refreshMe()
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [refreshMe])
 
   const login = useCallback(async (payload) => {

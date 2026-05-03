@@ -5,6 +5,7 @@ description = "Friday — A Tony Stark-inspired MCP server"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi",
     "fastmcp",
     "httpx",
     "livekit-agents[deepgram,groq,openai,sarvam,silero]>=1.5.1",
@@ -12,10 +13,14 @@ dependencies = [
     "pydantic>=2.7",
     "pyautogui>=0.9.54",
     "python-dotenv",
+    "sqlalchemy",
+    "uvicorn",
 ]
 
 [project.scripts]
 friday = "server.server:main"
+friday-api = "friday.src.main:main"
+friday_api = "friday.src.main:main"
 friday_voice = "server.agent_friday:dev" # Points to the wrapper
 
 [build-system]

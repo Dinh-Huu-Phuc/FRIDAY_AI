@@ -6,6 +6,7 @@ export const backendConfig = {
     me: process.env.BACKEND_ME_PATH || "/api/v1/auth/me",
     logout: process.env.BACKEND_LOGOUT_PATH || "/api/v1/auth/logout",
     refresh: process.env.BACKEND_REFRESH_PATH || "/api/v1/auth/refresh",
+    apiKeys: process.env.BACKEND_API_KEYS_PATH || "/api/v1/api-keys",
     verifyKey: process.env.BACKEND_API_KEY_VERIFY_PATH || "/api/v1/api-keys/verify",
     agentChat: process.env.BACKEND_AGENT_CHAT_PATH || "/api/v1/agent/chat"
   }

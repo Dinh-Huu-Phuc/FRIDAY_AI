@@ -15,29 +15,26 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   return (
     <div
-      className={cn(
-        "flex gap-3",
-        isUser ? "justify-end" : "justify-start"
-      )}
+      className={cn("flex w-full gap-3", isUser ? "justify-end" : "justify-start")}
     >
       {!isUser ? (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-          <Bot className="size-4 text-zinc-200" />
+        <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/10">
+          <Bot className="size-4 text-cyan-100" />
         </div>
       ) : null}
 
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl border px-4 py-3 text-sm leading-6 shadow-sm",
+          "max-w-[78%] px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[72%]",
           isUser
-            ? "border-white/10 bg-white/[0.08] text-zinc-50"
-            : "border-white/8 bg-[#11161c] text-zinc-200"
+            ? "rounded-[22px] rounded-br-md bg-cyan-500/15 text-zinc-50"
+            : "rounded-[22px] rounded-bl-md bg-transparent text-zinc-200"
         )}
       >
-        <div className="mb-1 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+        <div className="mb-1 flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.16em] text-zinc-500">
           <div className="flex items-center gap-2">
             <span>{isUser ? "User" : "FIRDAY"}</span>
-            <span className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] tracking-[0.14em] text-zinc-400">
+            <span className="flex items-center gap-1 rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] tracking-[0.12em] text-zinc-400">
               {isVoice ? <Mic className="size-3" /> : <Keyboard className="size-3" />}
               {isVoice ? "Voice" : "Text"}
             </span>
@@ -48,8 +45,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
 
       {isUser ? (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-          <User className="size-4 text-zinc-200" />
+        <div className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-white/8">
+          <User className="size-4 text-zinc-100" />
         </div>
       ) : null}
     </div>

@@ -1,14 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Menu, Mic } from "lucide-react"
+import { KeyRound, Menu, Mic } from "lucide-react"
 
 import { AgentAudioPanel } from "@/components/console/audio/agent-audio-panel"
+import { FloatingVoiceWidget } from "@/components/console/audio/floating-voice-widget"
+import { ApiKeyConnectModal } from "@/components/api-key/ApiKeyConnectModal"
 import { ChatInput } from "@/components/console/chat-input"
 import { ChatPanel } from "@/components/console/chat-panel"
+import { FreeLimitReachedModal } from "@/components/usage/FreeLimitReachedModal"
+import { FreeUsageBadge } from "@/components/usage/FreeUsageBadge"
 import { MicSettingsDrawer } from "@/components/console/drawer/mic-settings-drawer"
 import { PageShell } from "@/components/layout/page-shell"
 import { useBackendConnection } from "@/hooks/use-backend-connection"
+import { useAuth } from "@/hooks/useAuth"
+import { useFreeUsageLimit } from "@/hooks/useFreeUsageLimit"
+import { useFridayApiKey } from "@/hooks/useFridayApiKey"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { resolveBackendStatus } from "@/lib/api"
@@ -61,16 +68,33 @@ function resolveSpeechRecognitionConstructor() {
 
 export default function ConsolePage() {
   const { isConnected } = useBackendConnection()
+  const { isAuthenticated } = useAuth()
+  const {
+    keyStatus,
+    savedKeys,
+    connected: apiKeyConnected,
+    connectKey,
+  } = useFridayApiKey()
+  const {
+    freeUsedToday,
+    freeLimit,
+    recordFreeUse,
+    isFreeLimitReached,
+  } = useFreeUsageLimit()
   const [snapshot, setSnapshot] = useState<ConsoleSnapshot | null>(null)
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false)
+  const [freeLimitModalOpen, setFreeLimitModalOpen] = useState(false)
+  const [voiceVisualizerOpen, setVoiceVisualizerOpen] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(true)
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [voiceDetected, setVoiceDetected] = useState(false)
+  const [voiceLevel, setVoiceLevel] = useState(0)
   const [voiceInputSupported] = useState(() => Boolean(resolveSpeechRecognitionConstructor()))
   const [voiceOutputSupported] = useState(() => {
     if (typeof window === "undefined") return false
@@ -120,11 +144,21 @@ export default function ConsolePage() {
       )
 
       updateDraft("")
-      const result = await sendAgentMessage(normalizedContent, channel)
-      setSnapshot(result.data)
-      setSending(false)
+      try {
+        const result = await sendAgentMessage(normalizedContent, channel)
+        setSnapshot(result.data)
+        if (!apiKeyConnected) {
+          recordFreeUse()
+        }
+      } catch (error) {
+        if ((error as Error & { code?: string }).code === "FREE_LIMIT_REACHED") {
+          setFreeLimitModalOpen(true)
+        }
+      } finally {
+        setSending(false)
+      }
     },
-    [updateDraft]
+    [apiKeyConnected, recordFreeUse, updateDraft]
   )
 
   useEffect(() => {
@@ -264,6 +298,7 @@ export default function ConsolePage() {
       }
 
       setVoiceDetected(false)
+      setVoiceLevel(0)
     }
 
     const startMicMonitoring = async () => {
@@ -298,6 +333,7 @@ export default function ConsolePage() {
 
         const rms = Math.sqrt(sumSquares / sampleBuffer.length)
         setVoiceDetected(rms > 0.03)
+        setVoiceLevel(Math.min(1, rms * 14))
         animationFrameRef.current = window.requestAnimationFrame(tick)
       }
 
@@ -394,7 +430,7 @@ export default function ConsolePage() {
       safetyMode={snapshot.runtimeState.safetyMode}
       busy={sending || isListening}
     >
-      <div className="space-y-5">
+      <div className="flex min-h-[calc(100vh-9rem)] flex-col gap-5">
         <div className="flex flex-col gap-4 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-[0.28em] text-zinc-500">
@@ -412,6 +448,18 @@ export default function ConsolePage() {
             <Badge className="border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-xs font-medium text-cyan-100">
               {snapshot.messages.length} Turns Synced
             </Badge>
+            <FreeUsageBadge
+              used={freeUsedToday}
+              limit={freeLimit}
+              connected={apiKeyConnected}
+            />
+            <Button
+              variant="outline"
+              onClick={() => setApiKeyModalOpen(true)}
+            >
+              <KeyRound />
+              {apiKeyConnected ? "Replace Key" : "Connect Key"}
+            </Button>
             <Button variant="outline" onClick={() => setDrawerOpen(true)}>
               <Menu />
               Mic Menu
@@ -430,26 +478,34 @@ export default function ConsolePage() {
         <ChatPanel
           messages={snapshot.messages}
           loading={loading}
-          className="h-[660px]"
+          className="min-h-[680px] flex-1"
+          floatingWidget={
+            <FloatingVoiceWidget
+              active={agentAudioActive}
+              statusLabel={agentAudioStatus}
+              voiceReplyEnabled={voiceReplyEnabled}
+              voiceOutputSupported={voiceOutputSupported}
+              voiceLevel={voiceLevel}
+              onToggleVoiceReply={toggleVoiceReply}
+              onExpand={() => setVoiceVisualizerOpen(true)}
+            />
+          }
         />
 
-        <ChatInput
-          value={message}
-          onChange={updateDraft}
-          onSubmit={handleSend}
-          onClear={() => setSnapshot((current) => (current ? { ...current, messages: [] } : current))}
-          loading={sending}
-          placeholder="Type a message, or open the mic menu on the right to talk with FIRDAY..."
-        />
-
-        <AgentAudioPanel
-          active={agentAudioActive}
-          statusLabel={agentAudioStatus}
-          voiceReplyEnabled={voiceReplyEnabled}
-          voiceOutputSupported={voiceOutputSupported}
-          latestReply={latestAssistantReply}
-          onToggleVoiceReply={toggleVoiceReply}
-        />
+        <div className="sticky bottom-0 z-20 bg-[#0b0f14]/90 pb-1 pt-2 backdrop-blur-xl">
+          <ChatInput
+            value={message}
+            onChange={updateDraft}
+            onSubmit={handleSend}
+            onClear={() => setSnapshot((current) => (current ? { ...current, messages: [] } : current))}
+            loading={sending}
+            placeholder={
+              !apiKeyConnected && isFreeLimitReached
+                ? "Free limit reached. Connect a FRIDAY API key to continue..."
+                : "Message FIRDAY..."
+            }
+          />
+        </div>
       </div>
 
       <MicSettingsDrawer
@@ -463,6 +519,42 @@ export default function ConsolePage() {
         onClose={() => setDrawerOpen(false)}
         onToggleListening={handleToggleListening}
       />
+
+      <ApiKeyConnectModal
+        open={apiKeyModalOpen}
+        onClose={() => setApiKeyModalOpen(false)}
+        isAuthenticated={isAuthenticated}
+        onConnected={connectKey}
+        savedKeys={savedKeys}
+        connectedKey={keyStatus}
+      />
+      <FreeLimitReachedModal
+        open={freeLimitModalOpen}
+        onClose={() => setFreeLimitModalOpen(false)}
+        onConnectKey={() => {
+          setFreeLimitModalOpen(false)
+          setApiKeyModalOpen(true)
+        }}
+      />
+      {voiceVisualizerOpen ? (
+        <div className="fixed right-4 top-24 z-50 w-[min(28rem,calc(100vw-2rem))]">
+          <div className="rounded-[22px] border border-cyan-400/20 bg-[#050b10]/95 p-2 shadow-2xl shadow-cyan-950/40 backdrop-blur-xl">
+            <AgentAudioPanel
+              active={agentAudioActive}
+              statusLabel={agentAudioStatus}
+              voiceReplyEnabled={voiceReplyEnabled}
+              voiceOutputSupported={voiceOutputSupported}
+              latestReply={latestAssistantReply}
+              onToggleVoiceReply={toggleVoiceReply}
+            />
+            <div className="mt-3 flex justify-end">
+              <Button size="sm" variant="outline" onClick={() => setVoiceVisualizerOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   )
 }

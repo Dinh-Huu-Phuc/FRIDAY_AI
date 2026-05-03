@@ -2,7 +2,8 @@ import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
 const DEFAULT_BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001"
+const API_PREFIX = "/api/v1"
 
 function resolveBackendBaseUrl(request: NextRequest) {
   const headerValue = request.headers.get("x-backend-base-url")?.trim()
@@ -13,7 +14,7 @@ function resolveBackendBaseUrl(request: NextRequest) {
 function buildTargetUrl(request: NextRequest, path: string[]) {
   const backendBaseUrl = resolveBackendBaseUrl(request)
   const incomingUrl = new URL(request.url)
-  const targetUrl = new URL(`${backendBaseUrl}/${path.join("/")}`)
+  const targetUrl = new URL(`${backendBaseUrl}${API_PREFIX}/${path.join("/")}`)
   targetUrl.search = incomingUrl.search
   return targetUrl
 }

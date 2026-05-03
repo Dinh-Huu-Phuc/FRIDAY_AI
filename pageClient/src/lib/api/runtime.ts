@@ -158,28 +158,64 @@ export async function sendAgentMessage(
   channel: ChatChannel = "text"
 ): Promise<ApiResult<ConsoleSnapshot>> {
   const fallbackSnapshot = createMockConsoleSnapshot("mock")
-
-  return requestJson<ConsoleSnapshot>({
-    path: "/agent/chat",
-    method: "POST",
-    body: { message, channel },
-    fallback: () => ({
-      ...fallbackSnapshot,
-      messages: [
-        ...fallbackSnapshot.messages,
-        {
-          id: `user-${Date.now()}`,
-          role: "user",
-          content: message,
-          timestamp: new Date().toISOString(),
-          channel,
-          status: "sent",
-        },
-        createMockChatReply(message, channel),
-      ],
-      backendStatus: resolveBackendStatus("mock"),
-    }),
+  const fallback = () => ({
+    ...fallbackSnapshot,
+    messages: [
+      ...fallbackSnapshot.messages,
+      {
+        id: `user-${Date.now()}`,
+        role: "user" as const,
+        content: message,
+        timestamp: new Date().toISOString(),
+        channel,
+        status: "sent" as const,
+      },
+      createMockChatReply(message, channel),
+    ],
+    backendStatus: resolveBackendStatus("mock"),
   })
+
+  try {
+    const response = await fetch("/api/agent/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, channel }),
+      cache: "no-store",
+    })
+    const payload = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      const error = new Error(payload.message || "Agent request failed.") as Error & {
+        code?: string
+        status?: number
+      }
+      error.code = payload.code
+      error.status = response.status
+      throw error
+    }
+
+    return {
+      ok: true,
+      data: payload as ConsoleSnapshot,
+      source: "api",
+      status: response.status,
+    }
+  } catch (error) {
+    if (error instanceof Error && (error as Error & { code?: string }).code) {
+      throw error
+    }
+
+    return {
+      ok: false,
+      data: fallback(),
+      source: "mock",
+      status: 0,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Backend unavailable. Showing mock data.",
+    }
+  }
 }
 
 export function loadSettings(): SettingsState {

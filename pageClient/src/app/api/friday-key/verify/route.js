@@ -38,7 +38,7 @@ export async function POST(request) {
       )
     }
 
-    const keyMetadata = normalizeKeyMetadata(payload)
+    const keyMetadata = normalizeKeyMetadata(payload.api_key || payload.key || payload)
     const response = NextResponse.json({ connected: true, key: keyMetadata })
     response.cookies.set(CONNECTED_KEY_COOKIE, JSON.stringify(keyMetadata), {
       httpOnly: true,
