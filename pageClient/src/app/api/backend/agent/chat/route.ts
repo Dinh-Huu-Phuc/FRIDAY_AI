@@ -5,7 +5,8 @@ import { createMockChatReply, createMockConsoleSnapshot } from "@/lib/mock-data"
 import type { ChatChannel, ConsoleSnapshot } from "@/lib/types"
 
 const DEFAULT_BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000"
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001"
+const API_PREFIX = "/api/v1"
 
 function resolveBackendBaseUrl(request: NextRequest) {
   const headerValue = request.headers.get("x-backend-base-url")?.trim()
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
   const channel = payload.channel ?? "text"
 
   try {
-    const response = await fetch(`${backendBaseUrl}/agent/chat`, {
+    const response = await fetch(`${backendBaseUrl}${API_PREFIX}/agent/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

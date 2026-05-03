@@ -18,7 +18,7 @@ class Settings:
     sse_prefix: str = "/sse"
     environment: str = os.getenv("FRIDAY_ENV", "local")
     host: str = os.getenv("FRIDAY_API_HOST", "127.0.0.1")
-    port: int = int(os.getenv("FRIDAY_API_PORT", "8000"))
+    port: int = int(os.getenv("FRIDAY_API_PORT", "8001"))
     cors_origins: list[str] = [
         origin.strip()
         for origin in os.getenv(
@@ -33,6 +33,7 @@ class Settings:
     db_user: str = os.getenv("DB_USER", "")
     db_password: str = os.getenv("DB_PASSWORD", "")
     sql_server_driver: str = os.getenv("SQL_SERVER_DRIVER", "ODBC Driver 18 for SQL Server")
+    sql_server_encrypt: str = os.getenv("SQL_SERVER_ENCRYPT", "No")
 
     jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "change-me-in-env")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
@@ -53,6 +54,7 @@ class Settings:
             f"DATABASE={self.db_name};"
             f"UID={self.db_user};"
             f"PWD={self.db_password};"
+            f"Encrypt={self.sql_server_encrypt};"
             "TrustServerCertificate=yes;"
         )
         return f"mssql+pyodbc:///?odbc_connect={quote_plus(odbc_connection)}"

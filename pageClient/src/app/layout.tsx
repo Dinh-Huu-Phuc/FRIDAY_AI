@@ -15,12 +15,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark h-full antialiased">
-      <body className="min-h-full bg-background font-sans text-foreground">
+    <html lang="en" className="dark h-full antialiased" suppressHydrationWarning>
+      <body
+        className="h-full overflow-hidden bg-background font-sans text-foreground"
+        suppressHydrationWarning
+      >
         <TooltipProvider>
-          <div className="flex min-h-screen bg-[#0b0f14] text-zinc-50">
+          <div className="flex h-screen overflow-hidden bg-[#0b0f14] text-zinc-50">
             <AppSidebar />
-            <div className="flex min-h-screen flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <GlobalConnectionReport />
               {children}
             </div>

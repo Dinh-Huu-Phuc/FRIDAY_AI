@@ -24,3 +24,7 @@ class ApiKeyCreateRequest(BaseModel):
     rate_limit_per_minute: int | None = Field(default=None, ge=1)
     token_limit_daily: int | None = Field(default=None, ge=1)
     notes: str | None = None
+
+
+class ApiKeyVerifyRequest(BaseModel):
+    api_key: str = Field(min_length=1)

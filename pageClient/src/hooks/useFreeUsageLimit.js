@@ -20,7 +20,8 @@ export function useFreeUsageLimit() {
   }, [])
 
   useEffect(() => {
-    reload()
+    const timer = window.setTimeout(reload, 0)
+    return () => window.clearTimeout(timer)
   }, [reload])
 
   const recordFreeUse = useCallback(() => {

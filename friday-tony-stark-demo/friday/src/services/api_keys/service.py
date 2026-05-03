@@ -6,8 +6,14 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from friday.src.common.security import generate_internal_api_key, hash_secret
-from friday.src.crud.internal_api_key_crud import create_api_key, get_api_key, list_api_keys, revoke_api_key
+from friday.src.common.security import generate_internal_api_key, hash_secret, verify_secret
+from friday.src.crud.internal_api_key_crud import (
+    create_api_key,
+    get_api_key,
+    get_api_key_by_prefix,
+    list_api_keys,
+    revoke_api_key,
+)
 from friday.src.models.internal_api_key import InternalApiKey
 from friday.src.models.user import User
 from friday.src.schemas.api_keys.requests import ApiKeyCreateRequest
@@ -87,4 +93,22 @@ def revoke_internal_api_key(db: Session, current_user: User, key_id: int) -> Api
         db.add(row)
         db.commit()
         db.refresh(row)
+    return _metadata(row)
+
+
+def verify_internal_api_key(db: Session, api_key: str, current_user: User) -> ApiKeyMetadataResponse:
+    key_prefix = api_key[:24]
+    row = get_api_key_by_prefix(db, key_prefix)
+    if row is None or not verify_secret(api_key, row.key_hash):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found.")
+    if not _is_admin(current_user) and row.owner_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot use another user's API key.")
+    if row.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key is not active.")
+    if row.expires_at is not None and row.expires_at < datetime.now(timezone.utc):
+        row.status = "expired"
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="API key has expired.")
     return _metadata(row)

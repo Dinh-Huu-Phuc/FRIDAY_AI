@@ -368,7 +368,7 @@ export function createMockComputerSnapshot(
 export function createMockSettings(): SettingsState {
   return {
     backendBaseUrl:
-      process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000",
+      process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001",
     autoRefresh: true,
     refreshIntervalMs: 8000,
     showSafetyMode: true,

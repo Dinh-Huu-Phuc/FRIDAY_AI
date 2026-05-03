@@ -45,7 +45,11 @@ export function RegisterForm({ onSubmit, loading }) {
         <Field label="Confirm password" type="password" value={form.confirm_password} error={errors.confirm_password} onChange={(value) => update("confirm_password", value)} autoComplete="new-password" />
       </div>
 
-      <Button className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400" disabled={loading}>
+      <Button
+        type="submit"
+        className="w-full bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+        disabled={loading}
+      >
         {loading ? "Creating account..." : "Create Account"}
       </Button>
     </form>

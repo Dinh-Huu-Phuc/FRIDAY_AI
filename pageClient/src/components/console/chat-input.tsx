@@ -31,28 +31,28 @@ export function ChatInput({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="mx-auto w-full max-w-[820px] rounded-[28px] border border-white/10 bg-[#0b1117]/95 p-3 shadow-2xl shadow-black/30 backdrop-blur">
       <Textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder ?? "Send FIRDAY a command or ask for the next safe step..."}
-        className="min-h-28 resize-none border-white/10 bg-[#0f1419]"
+        className="min-h-20 resize-none rounded-[20px] border-transparent bg-transparent px-3 py-3 text-sm leading-6 focus-visible:border-cyan-400/30 focus-visible:ring-cyan-400/15"
       />
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-          Ctrl + Enter to send quickly
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3 px-1">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+          Ctrl + Enter
         </p>
         <div className="flex flex-wrap justify-end gap-2">
           {onClear ? (
-            <Button variant="outline" onClick={onClear} disabled={loading}>
+            <Button size="sm" variant="ghost" onClick={onClear} disabled={loading}>
               <Trash2 />
               Clear
             </Button>
           ) : null}
-          <Button onClick={onSubmit} disabled={loading || !value.trim()}>
+          <Button size="sm" onClick={onSubmit} disabled={loading || !value.trim()}>
             {loading ? <Loader2 className="animate-spin" /> : <Send />}
-            Send Text
+            Send
           </Button>
         </div>
       </div>

@@ -28,7 +28,7 @@ export function AppSidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="hidden border-r border-white/10 bg-[#0d1117] lg:flex lg:w-72 lg:flex-col">
+    <aside className="hidden h-screen shrink-0 border-r border-white/10 bg-[#0d1117] lg:flex lg:w-72 lg:flex-col">
       <div className="border-b border-white/10 px-5 py-5">
         <div className="flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
