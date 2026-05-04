@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server"
 import { backendConfig, backendRequest, jsonError } from "@/api/backendClient"
-
-const ACCESS_COOKIE = "friday_access_token"
-const REFRESH_COOKIE = "friday_refresh_token"
+import { REFRESH_COOKIE, extractCookieValue, setAccessCookie, setRefreshCookie } from "@/api/authCookies"
 
 export async function POST(request) {
   try {
@@ -11,9 +9,10 @@ export async function POST(request) {
       return NextResponse.json({ message: "Refresh token is missing." }, { status: 401 })
     }
 
-    const payload = await backendRequest(backendConfig.paths.refresh, {
+    const { data: payload, response: backendResponse } = await backendRequest(backendConfig.paths.refresh, {
       method: "POST",
       body: { refresh_token: refreshToken },
+      includeResponse: true,
     })
     const response = NextResponse.json({
       user: payload.user || null,
@@ -21,15 +20,8 @@ export async function POST(request) {
       expires_in: payload.expires_in || null,
     })
 
-    if (payload.access_token) {
-      response.cookies.set(ACCESS_COOKIE, payload.access_token, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: Number(payload.expires_in || 60 * 30),
-      })
-    }
+    setAccessCookie(response, payload)
+    setRefreshCookie(response, extractCookieValue(backendResponse.headers.get("set-cookie"), REFRESH_COOKIE))
 
     return response
   } catch (error) {

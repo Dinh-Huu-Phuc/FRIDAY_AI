@@ -7,7 +7,7 @@ from friday.src.schemas.users.responses import UserResponse
 
 class TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse

@@ -39,6 +39,10 @@ class Settings:
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     refresh_token_expire_days: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+    refresh_token_cookie_name: str = os.getenv("REFRESH_TOKEN_COOKIE_NAME", "friday_refresh_token")
+    refresh_token_cookie_path: str = os.getenv("REFRESH_TOKEN_COOKIE_PATH", "/api/v1/auth/refresh")
+    refresh_token_cookie_samesite: str = os.getenv("REFRESH_TOKEN_COOKIE_SAMESITE", "lax")
+    refresh_token_cookie_secure: bool = os.getenv("REFRESH_TOKEN_COOKIE_SECURE", "").lower() in {"1", "true", "yes", "on"}
     friday_api_key_pepper: str = os.getenv("FRIDAY_API_KEY_PEPPER", jwt_secret_key)
 
     @property
