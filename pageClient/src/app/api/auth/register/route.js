@@ -1,30 +1,6 @@
 import { NextResponse } from "next/server"
 import { backendConfig, backendRequest, jsonError } from "@/api/backendClient"
-
-const ACCESS_COOKIE = "friday_access_token"
-const REFRESH_COOKIE = "friday_refresh_token"
-
-function setAuthCookies(response, payload) {
-  if (payload.access_token) {
-    response.cookies.set(ACCESS_COOKIE, payload.access_token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: Number(payload.expires_in || 60 * 30),
-    })
-  }
-
-  if (payload.refresh_token) {
-    response.cookies.set(REFRESH_COOKIE, payload.refresh_token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30,
-    })
-  }
-}
+import { REFRESH_COOKIE, extractCookieValue, setAccessCookie, setRefreshCookie } from "@/api/authCookies"
 
 export async function POST(request) {
   try {
@@ -36,9 +12,10 @@ export async function POST(request) {
       )
     }
 
-    const payload = await backendRequest(backendConfig.paths.register, {
+    const { data: payload, response: backendResponse } = await backendRequest(backendConfig.paths.register, {
       method: "POST",
       body,
+      includeResponse: true,
     })
     const response = NextResponse.json({
       user: payload.user || payload,
@@ -46,7 +23,8 @@ export async function POST(request) {
       token_type: payload.token_type || "bearer",
       expires_in: payload.expires_in || null,
     })
-    setAuthCookies(response, payload)
+    setAccessCookie(response, payload)
+    setRefreshCookie(response, extractCookieValue(backendResponse.headers.get("set-cookie"), REFRESH_COOKIE))
     return response
   } catch (error) {
     return jsonError(error, 400)

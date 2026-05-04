@@ -15,6 +15,7 @@ async function request(path, options = {}) {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
+    credentials: "same-origin",
     cache: "no-store",
   })
   const payload = await readJson(response)
