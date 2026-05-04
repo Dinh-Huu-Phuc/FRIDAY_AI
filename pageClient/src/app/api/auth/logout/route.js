@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server"
 import { backendConfig, backendRequest } from "@/api/backendClient"
-
-const ACCESS_COOKIE = "friday_access_token"
-const REFRESH_COOKIE = "friday_refresh_token"
-const CONNECTED_KEY_COOKIE = "friday_connected_key"
+import { ACCESS_COOKIE, REFRESH_COOKIE, clearAuthCookies } from "@/api/authCookies"
 
 export async function POST(request) {
   const token = request.cookies.get(ACCESS_COOKIE)?.value
+  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value
 
-  if (token) {
+  if (token || refreshToken) {
     try {
       await backendRequest(backendConfig.paths.logout, {
         method: "POST",
         token,
+        body: { refresh_token: refreshToken || null },
       })
     } catch {
       // Logout must still clear local auth cookies if the backend is unavailable.
@@ -20,8 +19,6 @@ export async function POST(request) {
   }
 
   const response = NextResponse.json({ ok: true })
-  response.cookies.set(ACCESS_COOKIE, "", { path: "/", maxAge: 0 })
-  response.cookies.set(REFRESH_COOKIE, "", { path: "/", maxAge: 0 })
-  response.cookies.set(CONNECTED_KEY_COOKIE, "", { path: "/", maxAge: 0 })
+  clearAuthCookies(response)
   return response
 }

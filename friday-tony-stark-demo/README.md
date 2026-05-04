@@ -82,7 +82,7 @@ friday-tony-stark-demo/
 ### 2. Clone & install
 
 ```bash
-git clone https://github.com/SAGAR-TAMANG/friday-tony-stark-demo.git
+git clone https://github.com/Dinh-Huu-Phuc/FRIDAY_Ai
 cd friday-tony-stark-demo
 uv sync          # creates .venv and installs all dependencies
 ```
@@ -175,6 +175,189 @@ The MCP server will pick it up on next start.
 - **Google Gemini 2.5 Flash** — LLM
 - **OpenAI TTS** (`nova` voice) — TTS
 - **[uv](https://github.com/astral-sh/uv)** — fast Python package manager
+
+---
+
+## FastAPI REST server for pageClient
+
+The web dashboard does **not** call the MCP server directly. It calls the FastAPI REST server on port `8001`.
+
+| Command | Entry point | What it does |
+|---------|------------|--------------|
+| `uv run friday-api` | `friday/src/main.py -> main()` | Launches the FastAPI REST API for web clients such as `pageClient`. |
+| `uv run friday_api` | `friday/src/main.py -> main()` | Alias for `friday-api`. |
+
+Run it in a separate terminal when using `pageClient`:
+
+```powershell
+cd G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo
+uv run friday-api
+```
+
+FastAPI docs:
+
+```text
+http://127.0.0.1:8001/docs
+```
+
+Recommended local process layout:
+
+| Terminal | Command | Used by |
+|----------|---------|---------|
+| 1 | `uv run friday` | MCP tools for LiveKit / Agents Playground |
+| 2 | `uv run friday_voice` | LiveKit voice agent |
+| 3 | `uv run friday-api` | pageClient / REST API / docs |
+
+---
+
+## MCP vs FastAPI usage
+
+FRIDAY currently has two separate server surfaces:
+
+| Surface | Port | Consumer | Purpose |
+|---------|------|----------|---------|
+| MCP / SSE | `8000` | `https://agents-playground.livekit.io` through `friday_voice` | Voice agent tool calls, LiveKit agent tools, MCP resources/prompts. |
+| FastAPI REST | `8001` | `pageClient` and browser dashboard | Login, API keys, dashboard state, REST endpoints, web UI integration. |
+
+Shared business logic should live under `friday/app/...`.
+
+Adapters should stay thin:
+
+- MCP tools live in `friday/tools/...`
+- FastAPI routes live in `friday/src/router/v1/...`
+- pageClient calls FastAPI through `/api/backend/...`
+
+This keeps LiveKit and pageClient using the same backend logic without mixing MCP-only code into the web API.
+
+---
+
+## Windows Launcher
+
+The Windows Launcher lets FRIDAY search and open local Windows apps such as Notepad, Chrome, Calculator, or VS Code.
+
+Shared service:
+
+```text
+friday/app/windows_launcher/
+```
+
+MCP tool adapter:
+
+```text
+friday/tools/windows_launcher.py
+```
+
+FastAPI REST adapter:
+
+```text
+friday/src/router/v1/launcher/routes.py
+```
+
+Available MCP tools:
+
+| Tool | What it does |
+|------|--------------|
+| `search_windows_apps` | Searches installed Windows apps by name, similar to Start Menu search. |
+| `open_windows_app` | Opens the best matching Windows app. |
+
+Available FastAPI endpoints:
+
+| Method | Path | What it does |
+|--------|------|--------------|
+| `POST` | `/api/v1/launcher/apps/search` | Search installed Windows apps. |
+| `POST` | `/api/v1/launcher/apps/open` | Open the best matching app. |
+
+Search test:
+
+```powershell
+cd G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo
+$env:UV_CACHE_DIR="G:\data\AI_FRIDAY\v3\FRIDAY\.uv-cache"
+uv run python -c "from friday.app.windows_launcher.service import search_apps; print(search_apps('chrome', limit=5).model_dump(mode='json'))"
+```
+
+Open app test:
+
+```powershell
+cd G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo
+$env:UV_CACHE_DIR="G:\data\AI_FRIDAY\v3\FRIDAY\.uv-cache"
+uv run python -c "from friday.app.windows_launcher.service import open_app; print(open_app(query='notepad').model_dump(mode='json'))"
+```
+
+The open test launches a real Windows app on the machine.
+
+FastAPI test body for `/api/v1/launcher/apps/search`:
+
+```json
+{
+  "query": "chrome",
+  "limit": 5
+}
+```
+
+FastAPI test body for `/api/v1/launcher/apps/open`:
+
+```json
+{
+  "query": "notepad",
+  "min_score": 0.55
+}
+```
+
+---
+
+## Testing Windows Launcher in LiveKit Agents Playground
+
+1. Start the MCP server:
+
+```powershell
+cd G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo
+uv run friday
+```
+
+2. Start the LiveKit voice agent:
+
+```powershell
+cd G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo
+uv run friday_voice
+```
+
+3. Open:
+
+```text
+https://agents-playground.livekit.io
+```
+
+4. Say or type commands such as:
+
+```text
+Mở Notepad
+```
+
+```text
+FRIDAY mở Chrome giúp tớ
+```
+
+```text
+Open Visual Studio Code
+```
+
+```text
+Tìm ứng dụng calculator trên máy
+```
+
+Expected behavior:
+
+- The agent extracts the app name.
+- It calls the shared Windows Launcher service.
+- If the app launches successfully, FRIDAY can say it opened the app.
+- If launching fails, FRIDAY should report the failure instead of claiming success.
+
+If FRIDAY says the app opened but nothing appears:
+
+1. Restart `uv run friday_voice` so the latest runtime code is loaded.
+2. Confirm `uv run friday` is also running.
+3. Test the service directly with the Python command above.
+4. If direct Python opens the app but Playground does not, the Playground session is likely connected to an old or different voice-agent process.
 
 ---
 

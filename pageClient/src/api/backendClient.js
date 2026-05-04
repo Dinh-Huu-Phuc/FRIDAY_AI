@@ -12,7 +12,7 @@ export const backendConfig = {
   }
 }
 
-export async function backendRequest(path, { method = "GET", token, body, headers = {} } = {}) {
+export async function backendRequest(path, { method = "GET", token, body, headers = {}, includeResponse = false } = {}) {
   const response = await fetch(`${backendConfig.baseUrl}${path}`, {
     method,
     headers: {
@@ -30,6 +30,9 @@ export async function backendRequest(path, { method = "GET", token, body, header
     error.status = response.status
     error.data = data
     throw error
+  }
+  if (includeResponse) {
+    return { data, response }
   }
   return data
 }

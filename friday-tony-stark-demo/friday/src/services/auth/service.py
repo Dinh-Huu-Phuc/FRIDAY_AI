@@ -16,7 +16,12 @@ from friday.src.common.security import (
 )
 from friday.src.config.settings import get_settings
 from friday.src.crud.auth_login_audit_crud import create_login_audit
-from friday.src.crud.refresh_token_crud import create_refresh_token, get_refresh_token_by_hash, revoke_refresh_token
+from friday.src.crud.refresh_token_crud import (
+    create_refresh_token,
+    get_refresh_token_by_hash,
+    revoke_refresh_token,
+    revoke_refresh_tokens_for_user,
+)
 from friday.src.crud.role_crud import get_role_by_name
 from friday.src.crud.user_crud import (
     create_user,
@@ -105,11 +110,16 @@ def login_user(db: Session, payload: LoginRequest, request: Request) -> TokenRes
     return _issue_tokens(db, user, request)
 
 
-def refresh_access_token(db: Session, payload: RefreshRequest, request: Request) -> TokenResponse:
+def refresh_access_token(db: Session, refresh_token: str | None, request: Request) -> TokenResponse:
     settings = get_settings()
-    token_row = get_refresh_token_by_hash(db, hash_secret(payload.refresh_token, settings.jwt_secret_key))
-    if token_row is None or token_row.revoked_at is not None or token_row.expires_at < utc_now():
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token.")
+    token_row = get_refresh_token_by_hash(db, hash_secret(refresh_token, settings.jwt_secret_key))
+    if token_row is None or token_row.expires_at < utc_now():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token.")
+    if token_row.revoked_at is not None:
+        revoke_refresh_tokens_for_user(db, token_row.user_id)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token was already used.")
     user = get_user(db, token_row.user_id)
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is unavailable.")
@@ -117,9 +127,11 @@ def refresh_access_token(db: Session, payload: RefreshRequest, request: Request)
     return _issue_tokens(db, user, request)
 
 
-def logout_user(db: Session, payload: LogoutRequest) -> LogoutResponse:
+def logout_user(db: Session, refresh_token: str | None) -> LogoutResponse:
     settings = get_settings()
-    token_row = get_refresh_token_by_hash(db, hash_secret(payload.refresh_token, settings.jwt_secret_key))
+    if not refresh_token:
+        return LogoutResponse()
+    token_row = get_refresh_token_by_hash(db, hash_secret(refresh_token, settings.jwt_secret_key))
     if token_row is not None and token_row.revoked_at is None:
         revoke_refresh_token(db, token_row)
     return LogoutResponse()
