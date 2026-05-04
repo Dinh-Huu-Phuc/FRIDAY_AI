@@ -2,7 +2,8 @@ DEV ĐINH HỮU PHÚC
 
 # BANNER FIRDAY
 
-![Banner FIRDAY](friday/assets/img/tanthuyhoangdev.png)
+![Banner FRIDAY](https://github.com/Dinh-Huu-Phuc/FRIDAY_AI/blob/main/friday-tony-stark-demo/friday/assets/img/tanthuyhoangdev.png?raw=true)
+
 
 
 
