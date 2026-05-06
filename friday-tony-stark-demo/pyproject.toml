@@ -16,6 +16,7 @@ dependencies = [
     "opencv-python",
     "pydantic>=2.7",
     "pyautogui>=0.9.54",
+    "pyodbc",
     "python-dotenv",
     "sqlalchemy",
     "uvicorn",

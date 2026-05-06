@@ -10,6 +10,10 @@ __pycache__/
 friday/trainModel/agents/
 friday/trainModel/hooks/
 friday/trainModel/skills/
+friday/trainModel/data/
+friday/trainModel/docs/
+friday/trainModel/losses/
+friday/trainModel/emotion/
 
 
 # C extensions
