@@ -4,7 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   Bot,
-  ChevronRight,
   Computer,
   Hand,
   LayoutDashboard,
@@ -30,66 +29,43 @@ export function AppSidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="hidden h-screen shrink-0 border-r border-white/10 bg-[#0d1117] lg:flex lg:w-72 lg:flex-col">
-      <div className="border-b border-white/10 px-5 py-5">
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-            <Bot className="size-5 text-zinc-100" />
+    <header className="sticky top-0 z-50 shrink-0 border-b border-white/10 bg-[#070b10]/92 px-3 py-3 text-zinc-50 shadow-[0_16px_44px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <Link href="/dashboard" className="flex min-w-fit items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/8 shadow-[0_0_18px_rgba(0,245,255,0.18)]">
+            <Bot className="size-5 text-cyan-100" />
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.24em] text-zinc-500">
-              FIRDAY
-            </p>
-            <h1 className="text-lg font-semibold text-zinc-100">
-              Agent Control Panel
-            </h1>
+            <p className="text-[11px] uppercase text-zinc-500">FIRDAY</p>
+            <h1 className="text-base font-semibold text-zinc-100">Agent Control Panel</h1>
           </div>
-        </div>
-      </div>
+        </Link>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
-          const Icon = item.icon
-          const active =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href))
+        <nav className="flex gap-2 overflow-x-auto pb-1 lg:justify-end lg:pb-0" aria-label="Primary navigation">
+          {navigation.map((item) => {
+            const Icon = item.icon
+            const active =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href))
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "group flex items-center justify-between rounded-xl border px-3 py-2.5 transition-colors",
-                active
-                  ? "border-white/15 bg-white/8 text-zinc-50"
-                  : "border-transparent text-zinc-400 hover:border-white/10 hover:bg-white/5 hover:text-zinc-100"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-lg",
-                    active ? "bg-white/10" : "bg-transparent"
-                  )}
-                >
-                  <Icon className="size-4" />
-                </div>
-                <span className="text-sm font-medium">{titleCase(item.label)}</span>
-              </div>
-              <ChevronRight
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
                 className={cn(
-                  "size-4 transition-transform",
-                  active ? "translate-x-0 text-zinc-300" : "translate-x-1 text-zinc-600 group-hover:text-zinc-400"
+                  "flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium uppercase transition-colors",
+                  active
+                    ? "border-cyan-300/35 bg-cyan-300/14 text-cyan-50 shadow-[0_0_18px_rgba(0,245,255,0.16)]"
+                    : "border-white/8 bg-white/[0.03] text-zinc-400 hover:border-white/14 hover:bg-white/[0.06] hover:text-zinc-100"
                 )}
-              />
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div className="border-t border-white/10 px-5 py-4 text-xs text-zinc-500">
-        Built for monitoring and operating the FIRDAY computer control agent.
+              >
+                <Icon className="size-4" />
+                <span>{titleCase(item.label)}</span>
+              </Link>
+            )
+          })}
+        </nav>
       </div>
-    </aside>
+    </header>
   )
 }
