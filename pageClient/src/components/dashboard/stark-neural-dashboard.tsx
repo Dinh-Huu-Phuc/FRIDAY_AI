@@ -2,9 +2,36 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { DashboardBackground } from "@/components/dashboard/dashboard-background"
-import { createDashboardThreeCore } from "@/components/dashboard/js/dashboard-three-core"
+import { createDashboardThreeCore, type DashboardCoreColor } from "@/components/dashboard/js/dashboard-three-core"
 
 type Locale = "en" | "vi"
+type CoreSessionState = "idle" | "connecting" | "speaking" | "listening" | "thinking" | "error"
+
+type BrowserSpeechRecognition = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start: () => void
+  stop: () => void
+  abort: () => void
+}
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition
+
+type SpeechRecognitionEvent = {
+  results: {
+    length: number
+    [index: number]: {
+      isFinal: boolean
+      [index: number]: {
+        transcript: string
+      }
+    }
+  }
+}
 
 const copy = {
   en: {
@@ -13,6 +40,13 @@ const copy = {
     disconnect: "DISCONNECT",
     overlayStatus: "SYSTEM ONLINE",
     overlayListening: "LISTENING...",
+    overlayConnecting: "CONNECTING...",
+    overlaySpeaking: "SPEAKING...",
+    overlayThinking: "THINKING...",
+    overlayReady: "READY FOR INPUT",
+    textInputPlaceholder: "Type to FRIDAY...",
+    send: "SEND",
+    coreColor: "CORE COLOR",
     eyebrow: "FRIDAY // ACTIVE INTERFACE",
     title: "MARK VII NEURAL COMMAND",
     brief:
@@ -35,6 +69,13 @@ const copy = {
     disconnect: "NGAT KET NOI",
     overlayStatus: "HE THONG ONLINE",
     overlayListening: "DANG LANG NGHE...",
+    overlayConnecting: "DANG KET NOI...",
+    overlaySpeaking: "DANG BAO CAO...",
+    overlayThinking: "DANG SUY NGHI...",
+    overlayReady: "SAN SANG NHAN LENH",
+    textInputPlaceholder: "Nhap lenh cho FRIDAY...",
+    send: "GUI",
+    coreColor: "MAU LOI",
     eyebrow: "FRIDAY // GIAO DIEN DANG HOAT DONG",
     title: "DIEU KHIEN THAN KINH MARK VII",
     brief:
@@ -118,6 +159,36 @@ const ORBITAL_TARGET_SEEDS = [
   { x: -0.52, y: 0.22, duration: 8.1 },
   { x: 0.18, y: 0.58, duration: 7.7 },
 ]
+
+const DEFAULT_CORE_COLOR: DashboardCoreColor = { r: 255, g: 193, b: 90, a: 1 }
+
+function clampColorInput(value: number) {
+  return Math.min(255, Math.max(0, Math.round(Number.isFinite(value) ? value : 0)))
+}
+
+function clampAlphaInput(value: number) {
+  return Math.min(1, Math.max(0.08, Number.isFinite(value) ? value : 1))
+}
+
+function channelToHex(value: number) {
+  return clampColorInput(value).toString(16).padStart(2, "0")
+}
+
+function coreColorToHex(color: DashboardCoreColor) {
+  return `#${channelToHex(color.r)}${channelToHex(color.g)}${channelToHex(color.b)}`
+}
+
+function hexToCoreColor(hex: string, alpha: number): DashboardCoreColor {
+  const normalized = hex.replace("#", "")
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return { ...DEFAULT_CORE_COLOR, a: alpha }
+
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16),
+    a: alpha,
+  }
+}
 
 function AnimatedArcReactor() {
   const [pulseSeed, setPulseSeed] = useState(ARC_REACTOR_SEED)
@@ -306,10 +377,27 @@ function AnimatedOrbitalRadar() {
 export function StarkNeuralDashboard() {
   const [locale, setLocale] = useState<Locale>("en")
   const [overlayActive, setOverlayActive] = useState(false)
+  const [coreColor, setCoreColor] = useState<DashboardCoreColor>(DEFAULT_CORE_COLOR)
+  const [coreSessionState, setCoreSessionState] = useState<CoreSessionState>("idle")
+  const [coreReport, setCoreReport] = useState("")
+  const [coreTextInput, setCoreTextInput] = useState("")
   const terminalRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const coreColorRef = useRef(coreColor)
   const threeCoreRef = useRef<ReturnType<typeof createDashboardThreeCore> | null>(null)
+  const greetingAbortRef = useRef<AbortController | null>(null)
+  const ttsAbortRef = useRef<AbortController | null>(null)
+  const chatAbortRef = useRef<AbortController | null>(null)
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const coreTextSubmitRef = useRef<((message: string) => void) | null>(null)
+  const coreAudioRef = useRef<HTMLAudioElement | null>(null)
+  const coreAudioUrlRef = useRef<string | null>(null)
   const t = copy[locale]
+  const coreColorHex = useMemo(() => coreColorToHex(coreColor), [coreColor])
+  const coreColorCss = useMemo(
+    () => `rgba(${coreColor.r}, ${coreColor.g}, ${coreColor.b}, ${coreColor.a})`,
+    [coreColor]
+  )
 
   useEffect(() => {
     const initialize = window.setTimeout(() => {
@@ -333,6 +421,26 @@ export function StarkNeuralDashboard() {
   }, [locale])
 
   useEffect(() => {
+    if (!overlayActive) return
+
+    const dashboard = document.querySelector<HTMLElement>(".stark-dashboard")
+    const previousBodyOverflow = document.body.style.overflow
+    const previousDashboardOverflow = dashboard?.style.overflowY
+    const dashboardScrollTop = dashboard?.scrollTop ?? 0
+
+    document.body.style.overflow = "hidden"
+    if (dashboard) dashboard.style.overflowY = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      if (dashboard) {
+        dashboard.style.overflowY = previousDashboardOverflow ?? ""
+        dashboard.scrollTop = dashboardScrollTop
+      }
+    }
+  }, [overlayActive])
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       const firstLine = terminalRef.current?.firstElementChild
       if (firstLine) terminalRef.current?.appendChild(firstLine)
@@ -350,7 +458,7 @@ export function StarkNeuralDashboard() {
 
     if (!canvasRef.current || threeCoreRef.current) return
 
-    const core = createDashboardThreeCore(canvasRef.current)
+    const core = createDashboardThreeCore(canvasRef.current, coreColorRef.current)
     threeCoreRef.current = core
     core.setActive(true)
 
@@ -363,6 +471,265 @@ export function StarkNeuralDashboard() {
   useEffect(() => {
     threeCoreRef.current?.setActive(overlayActive)
   }, [overlayActive])
+
+  useEffect(() => {
+    if (!overlayActive) {
+      greetingAbortRef.current?.abort()
+      ttsAbortRef.current?.abort()
+      chatAbortRef.current?.abort()
+      speechRecognitionRef.current?.abort()
+      speechRecognitionRef.current = null
+      coreTextSubmitRef.current = null
+      coreAudioRef.current?.pause()
+      coreAudioRef.current = null
+
+      if (coreAudioUrlRef.current) {
+        URL.revokeObjectURL(coreAudioUrlRef.current)
+        coreAudioUrlRef.current = null
+      }
+
+      window.speechSynthesis?.cancel()
+      return
+    }
+
+    let cancelled = false
+    let shouldListen = false
+    let handlingTranscript = false
+    const greetingController = new AbortController()
+    greetingAbortRef.current = greetingController
+
+    async function speakWithBrowserFallback(text: string) {
+      if (!window.speechSynthesis || cancelled) return
+
+      await new Promise<void>((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = locale === "vi" ? "vi-VN" : "en-US"
+        utterance.rate = 1
+        utterance.pitch = 1
+        utterance.onend = () => resolve()
+        utterance.onerror = () => resolve()
+        window.speechSynthesis.cancel()
+        window.speechSynthesis.speak(utterance)
+      })
+    }
+
+    async function speakWithBackendTts(text: string) {
+      const ttsController = new AbortController()
+      ttsAbortRef.current = ttsController
+
+      const response = await fetch("/api/backend/agent/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, provider: "openai" }),
+        cache: "no-store",
+        signal: ttsController.signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`TTS failed with status ${response.status}`)
+      }
+
+      const audioBlob = await response.blob()
+      if (cancelled) return
+
+      if (coreAudioUrlRef.current) URL.revokeObjectURL(coreAudioUrlRef.current)
+      const audioUrl = URL.createObjectURL(audioBlob)
+      coreAudioUrlRef.current = audioUrl
+
+      const audio = new Audio(audioUrl)
+      coreAudioRef.current = audio
+
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve()
+        audio.onerror = () => reject(new Error("Audio playback failed."))
+        audio.play().catch(reject)
+      })
+    }
+
+    async function speakCoreResponse(text: string) {
+      try {
+        await speakWithBackendTts(text)
+      } catch {
+        await speakWithBrowserFallback(text)
+      }
+    }
+
+    function extractAssistantReply(payload: unknown) {
+      const messages = (payload as { messages?: Array<{ role?: string; content?: string }> }).messages ?? []
+      const assistantMessage = [...messages].reverse().find((message) => message.role === "assistant")
+      return String(assistantMessage?.content ?? "").trim()
+    }
+
+    function startListening() {
+      if (cancelled || handlingTranscript) return
+
+      const SpeechRecognitionConstructor =
+        (window as typeof window & {
+          SpeechRecognition?: BrowserSpeechRecognitionConstructor
+          webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor
+        }).SpeechRecognition ??
+        (window as typeof window & {
+          webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor
+        }).webkitSpeechRecognition
+
+      if (!SpeechRecognitionConstructor) {
+        setCoreSessionState("error")
+        setCoreReport("Speech recognition is not available in this browser. Use Chrome, or add backend STT for this Core AI session.")
+        return
+      }
+
+      const recognition = new SpeechRecognitionConstructor()
+      speechRecognitionRef.current = recognition
+      recognition.continuous = false
+      recognition.interimResults = false
+      recognition.lang = locale === "vi" ? "vi-VN" : "en-US"
+
+      recognition.onresult = (event) => {
+        let transcript = ""
+        for (let index = 0; index < event.results.length; index += 1) {
+          const result = event.results[index]
+          if (result.isFinal) transcript += result[0]?.transcript ?? ""
+        }
+
+        const normalizedTranscript = transcript.trim()
+        if (normalizedTranscript) {
+          void handleTranscript(normalizedTranscript)
+        }
+      }
+
+      recognition.onend = () => {
+        if (!cancelled && shouldListen && !handlingTranscript) {
+          window.setTimeout(() => {
+            try {
+              recognition.start()
+            } catch {
+              // Recognition can throw if the browser is still transitioning.
+            }
+          }, 220)
+        }
+      }
+
+      recognition.onerror = () => {
+        if (!cancelled && shouldListen && !handlingTranscript) {
+          setCoreSessionState("listening")
+        }
+      }
+
+      shouldListen = true
+      setCoreSessionState("listening")
+
+      try {
+        recognition.start()
+      } catch {
+        // Ignore duplicate-start errors from Chrome's SpeechRecognition implementation.
+      }
+    }
+
+    async function handleTranscript(transcript: string) {
+      if (cancelled || handlingTranscript) return
+
+      handlingTranscript = true
+      shouldListen = false
+      speechRecognitionRef.current?.stop()
+      setCoreSessionState("thinking")
+      setCoreReport(transcript)
+
+      const chatController = new AbortController()
+      chatAbortRef.current = chatController
+
+      try {
+        const response = await fetch("/api/backend/agent/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: transcript, channel: "voice" }),
+          cache: "no-store",
+          signal: chatController.signal,
+        })
+
+        const payload = await response.json()
+        const assistantReply = extractAssistantReply(payload)
+
+        if (!assistantReply || cancelled) return
+
+        setCoreSessionState("speaking")
+        setCoreReport(assistantReply)
+        await speakCoreResponse(assistantReply)
+      } catch (error) {
+        if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+          setCoreSessionState("error")
+          setCoreReport("Core AI could not process the voice turn. Check backend chat and TTS connectivity.")
+        }
+      } finally {
+        handlingTranscript = false
+        if (!cancelled) {
+          startListening()
+        }
+      }
+    }
+
+    coreTextSubmitRef.current = (message: string) => {
+      const normalizedMessage = message.trim()
+      if (!normalizedMessage) return
+      void handleTranscript(normalizedMessage)
+    }
+
+    async function startCoreGreeting() {
+      setCoreSessionState("connecting")
+      setCoreReport("")
+
+      try {
+        const response = await fetch("/api/backend/agent/greeting", {
+          method: "GET",
+          cache: "no-store",
+          signal: greetingController.signal,
+        })
+        const payload = (await response.json()) as { message?: string }
+        const report = String(payload.message ?? "").trim()
+
+        if (!report || cancelled) return
+
+        setCoreReport(report)
+        setCoreSessionState("speaking")
+
+        await speakCoreResponse(report)
+
+        if (!cancelled) {
+          startListening()
+        }
+      } catch (error) {
+        if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+          setCoreSessionState("error")
+          setCoreReport("Core AI session could not start. Check the backend connection and TTS configuration.")
+        }
+      }
+    }
+
+    void startCoreGreeting()
+
+    return () => {
+      cancelled = true
+      shouldListen = false
+      greetingController.abort()
+      ttsAbortRef.current?.abort()
+      chatAbortRef.current?.abort()
+      speechRecognitionRef.current?.abort()
+      speechRecognitionRef.current = null
+      coreTextSubmitRef.current = null
+      coreAudioRef.current?.pause()
+      coreAudioRef.current = null
+      window.speechSynthesis?.cancel()
+
+      if (coreAudioUrlRef.current) {
+        URL.revokeObjectURL(coreAudioUrlRef.current)
+        coreAudioUrlRef.current = null
+      }
+    }
+  }, [locale, overlayActive])
+
+  useEffect(() => {
+    coreColorRef.current = coreColor
+    threeCoreRef.current?.setColor(coreColor)
+  }, [coreColor])
 
   useEffect(() => {
     const dashboard = document.querySelector<HTMLElement>(".stark-dashboard")
@@ -416,16 +783,124 @@ export function StarkNeuralDashboard() {
   return (
     <main className="stark-dashboard">
       <DashboardBackground />
-      <div className={overlayActive ? "stark-ai-overlay is-active" : "stark-ai-overlay"} aria-hidden={!overlayActive}>
+      <div
+        className={overlayActive ? "stark-ai-overlay is-active" : "stark-ai-overlay"}
+        style={{
+          "--stark-core-color": coreColorCss,
+          "--stark-core-rgb": `${coreColor.r}, ${coreColor.g}, ${coreColor.b}`,
+          "--stark-core-alpha": coreColor.a,
+        } as CSSProperties}
+        aria-hidden={!overlayActive}
+      >
         <div className="stark-ai-core-stage">
           {overlayActive ? <canvas ref={canvasRef} id="neural-canvas" className="stark-neural-canvas" aria-hidden="true" /> : null}
+          <div className="stark-ai-equation" aria-hidden="true">
+            x<sup>2</sup> + y<sup>2</sup> + z<sup>2</sup> = R<sup>2</sup>
+          </div>
+          <div className="stark-ai-physics-readout" aria-hidden="true">
+            <span>E = mc<sup>2</sup></span>
+            <span>Psi = exp(-i k r) / r</span>
+            <span>Systemic Cohesion: Optimal</span>
+          </div>
           <div className="stark-ai-overlay-label">
             <span>{t.overlayStatus}</span>
-            <b>{t.overlayListening}</b>
+            <b>
+              {coreSessionState === "connecting"
+                ? t.overlayConnecting
+                : coreSessionState === "speaking"
+                  ? t.overlaySpeaking
+                  : coreSessionState === "thinking"
+                    ? t.overlayThinking
+                  : coreSessionState === "listening"
+                    ? t.overlayReady
+                    : t.overlayListening}
+            </b>
+            {coreReport ? <p className="stark-ai-session-report">{coreReport}</p> : null}
+            <form
+              className="stark-core-text-input"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const message = coreTextInput.trim()
+                if (!message || coreSessionState === "connecting" || coreSessionState === "speaking" || coreSessionState === "thinking") return
+                setCoreTextInput("")
+                coreTextSubmitRef.current?.(message)
+              }}
+            >
+              <input
+                type="text"
+                value={coreTextInput}
+                onChange={(event) => setCoreTextInput(event.target.value)}
+                placeholder={t.textInputPlaceholder as string}
+                aria-label={t.textInputPlaceholder as string}
+                disabled={!overlayActive}
+              />
+              <button
+                type="submit"
+                disabled={
+                  !coreTextInput.trim() ||
+                  coreSessionState === "connecting" ||
+                  coreSessionState === "speaking" ||
+                  coreSessionState === "thinking"
+                }
+              >
+                {t.send}
+              </button>
+            </form>
           </div>
           <button className="stark-overlay-close" type="button" onClick={() => setOverlayActive(false)}>
             {t.disconnect}
           </button>
+          <div className="stark-core-color-picker" aria-label={t.coreColor as string}>
+            <div className="stark-core-color-picker__head">
+              <span>{t.coreColor}</span>
+              <output>{coreColorCss}</output>
+            </div>
+            <div className="stark-core-color-picker__row">
+              <label className="stark-core-swatch">
+                <span>HEX</span>
+                <input
+                  type="color"
+                  value={coreColorHex}
+                  onChange={(event) => setCoreColor(hexToCoreColor(event.target.value, coreColor.a))}
+                  aria-label="Core color swatch"
+                />
+              </label>
+              {(["r", "g", "b"] as const).map((channel) => (
+                <label className="stark-core-channel" key={channel}>
+                  <span>{channel.toUpperCase()}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={255}
+                    value={coreColor[channel]}
+                    onChange={(event) =>
+                      setCoreColor((current) => ({
+                        ...current,
+                        [channel]: clampColorInput(Number(event.target.value)),
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <label className="stark-core-alpha">
+              <span>A</span>
+              <input
+                type="range"
+                min={0.08}
+                max={1}
+                step={0.01}
+                value={coreColor.a}
+                onChange={(event) =>
+                  setCoreColor((current) => ({
+                    ...current,
+                    a: clampAlphaInput(Number(event.target.value)),
+                  }))
+                }
+              />
+              <b>{coreColor.a.toFixed(2)}</b>
+            </label>
+          </div>
         </div>
       </div>
 
