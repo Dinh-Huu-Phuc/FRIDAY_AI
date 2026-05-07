@@ -6,6 +6,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 type DashboardThreeCore = {
   dispose: () => void
   setActive: (active: boolean) => void
+  setColor: (color: DashboardCoreColor) => void
 }
 
 type AudioState = {
@@ -15,6 +16,13 @@ type AudioState = {
   data: Uint8Array<ArrayBuffer> | null
   stream: MediaStream | null
   context: AudioContext | null
+}
+
+export type DashboardCoreColor = {
+  r: number
+  g: number
+  b: number
+  a: number
 }
 
 function createCircleGeometry(radius: number, segments = 384) {
@@ -32,18 +40,40 @@ function createCircleGeometry(radius: number, segments = 384) {
   return geometry
 }
 
-export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardThreeCore {
+function randomPointOnSphere(radius: number) {
+  const theta = Math.random() * Math.PI * 2
+  const phi = Math.acos(Math.random() * 2 - 1)
+  return new THREE.Vector3(
+    Math.sin(phi) * Math.cos(theta) * radius,
+    Math.sin(phi) * Math.sin(theta) * radius,
+    Math.cos(phi) * radius
+  )
+}
+
+function clampColorChannel(value: number) {
+  return THREE.MathUtils.clamp(Math.round(value), 0, 255)
+}
+
+function clampAlpha(value: number) {
+  return THREE.MathUtils.clamp(value, 0.08, 1)
+}
+
+export function createDashboardThreeCore(
+  canvas: HTMLCanvasElement,
+  initialColor: DashboardCoreColor = { r: 255, g: 193, b: 90, a: 1 }
+): DashboardThreeCore {
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 1000)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
   const timer = new THREE.Timer()
-  const amber = 0xff8c00
-  const amberHot = 0xffc15a
-  const deepAmber = 0x7a2d00
+  const coreColor = new THREE.Color()
+  const coreHotColor = new THREE.Color()
+  const coreDeepColor = new THREE.Color()
   const pointer = { x: 0, y: 0, targetX: 0, targetY: 0 }
   let animationFrame = 0
   let disposed = false
   let active = false
+  let coreAlpha = clampAlpha(initialColor.a)
 
   renderer.setPixelRatio(window.devicePixelRatio || 1)
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -53,10 +83,10 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
   camera.position.set(0, 0, 34)
 
   const core = new THREE.Group()
-  const ringGroup = new THREE.Group()
+  const sphereGroup = new THREE.Group()
   const filamentGroup = new THREE.Group()
   const particleGroup = new THREE.Group()
-  core.add(ringGroup, filamentGroup, particleGroup)
+  core.add(sphereGroup, filamentGroup, particleGroup)
   scene.add(core)
 
   const renderPass = new RenderPass(scene, camera)
@@ -70,70 +100,74 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
   composer.addPass(renderPass)
   composer.addPass(bloomPass)
 
-  const rings: Array<THREE.LineLoop | THREE.Mesh> = []
+  const sphereRadius = window.innerWidth < 720 ? 7.4 : 8.7
+  const sphereLines: Array<THREE.LineLoop | THREE.Mesh> = []
   const circleMaterial = new THREE.LineBasicMaterial({
-    color: amber,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.46,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   })
+  circleMaterial.userData.tone = "hot"
   const hotCircleMaterial = new THREE.LineBasicMaterial({
-    color: amberHot,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.88,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   })
-  const ringConfigs = [
-    { radius: 3.6, z: 0.36, x: 0, y: 0, speed: 0.38, material: hotCircleMaterial },
-    { radius: 4.75, z: 0.1, x: 0.1, y: 0.16, speed: -0.24, material: circleMaterial },
-    { radius: 5.9, z: -0.18, x: -0.12, y: 0.08, speed: 0.18, material: circleMaterial },
-    { radius: 7.15, z: 0.22, x: 0.22, y: -0.14, speed: -0.15, material: hotCircleMaterial },
-    { radius: 8.45, z: -0.32, x: -0.18, y: -0.2, speed: 0.11, material: circleMaterial },
-    { radius: 9.9, z: 0.02, x: Math.PI * 0.5, y: 0, speed: -0.07, material: circleMaterial },
-    { radius: 9.9, z: 0.02, x: 0, y: Math.PI * 0.5, speed: 0.085, material: circleMaterial },
-  ]
+  hotCircleMaterial.userData.tone = "hot"
 
-  ringConfigs.forEach((config) => {
-    const ring = new THREE.LineLoop(createCircleGeometry(config.radius), config.material.clone())
-    ring.position.z = config.z
-    ring.rotation.x = config.x
-    ring.rotation.y = config.y
-    ring.userData.speed = config.speed
-    ringGroup.add(ring)
-    rings.push(ring)
-  })
+  for (let index = 0; index < 34; index += 1) {
+    const ring = new THREE.LineLoop(
+      createCircleGeometry(sphereRadius * (0.985 + Math.random() * 0.035), 420),
+      (index % 7 === 0 ? hotCircleMaterial : circleMaterial).clone()
+    )
+    ring.rotation.x = Math.random() * Math.PI
+    ring.rotation.y = Math.random() * Math.PI
+    ring.rotation.z = Math.random() * Math.PI
+    ring.userData.speed = (Math.random() - 0.5) * 0.52
+    sphereGroup.add(ring)
+    sphereLines.push(ring)
+  }
 
   const torusMaterial = new THREE.MeshBasicMaterial({
-    color: amber,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.2,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   })
+  torusMaterial.userData.tone = "hot"
 
-  ;[
-    { radius: 2.15, tube: 0.035, z: 0.04, speed: 0.42 },
-    { radius: 6.45, tube: 0.026, z: -0.08, speed: -0.2 },
-    { radius: 8.85, tube: 0.02, z: 0.16, speed: 0.13 },
-  ].forEach((config) => {
-    const torus = new THREE.Mesh(new THREE.TorusGeometry(config.radius, config.tube, 12, 384), torusMaterial.clone())
-    torus.position.z = config.z
-    torus.userData.speed = config.speed
-    ringGroup.add(torus)
-    rings.push(torus)
-  })
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(sphereRadius * 1.006, 64, 36),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.07,
+      wireframe: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  )
+  shell.material.userData.tone = "base"
+  sphereGroup.add(shell)
+  sphereLines.push(shell)
+
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(sphereRadius * 1.018, 0.045, 16, 420),
+    torusMaterial.clone()
+  )
+  rim.userData.speed = 0.18
+  sphereGroup.add(rim)
+  sphereLines.push(rim)
 
   const nucleusCount = 480
   const nucleusPositions = new Float32Array(nucleusCount * 3)
 
   for (let index = 0; index < nucleusCount; index += 1) {
-    const angle = Math.random() * Math.PI * 2
-    const radius = 1.1 + Math.random() * 1.55
-    nucleusPositions[index * 3] = Math.cos(angle) * radius
-    nucleusPositions[index * 3 + 1] = Math.sin(angle) * radius
-    nucleusPositions[index * 3 + 2] = (Math.random() - 0.5) * 1.15
+    const point = randomPointOnSphere(sphereRadius * (0.18 + Math.random() * 0.78))
+    nucleusPositions[index * 3] = point.x
+    nucleusPositions[index * 3 + 1] = point.y
+    nucleusPositions[index * 3 + 2] = point.z
   }
 
   const nucleusGeometry = new THREE.BufferGeometry()
@@ -141,7 +175,6 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
   const nucleus = new THREE.Points(
     nucleusGeometry,
     new THREE.PointsMaterial({
-      color: amberHot,
       size: 0.09,
       transparent: true,
       opacity: 0.92,
@@ -149,16 +182,15 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
       depthWrite: false,
     })
   )
+  nucleus.material.userData.tone = "hot"
   core.add(nucleus)
 
   const nodeCount = window.innerWidth < 720 ? 240 : 380
   const nodes: THREE.Vector3[] = []
 
   for (let index = 0; index < nodeCount; index += 1) {
-    const angle = Math.random() * Math.PI * 2
-    const radius = 2.4 + Math.random() * 8.8
-    const z = (Math.random() - 0.5) * 5.2 + Math.sin(angle * 3 + radius) * 0.9
-    nodes.push(new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, z))
+    const point = randomPointOnSphere(sphereRadius * (0.86 + Math.random() * 0.18))
+    nodes.push(point)
   }
 
   const filamentPositions: number[] = []
@@ -169,7 +201,7 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
     for (let inner = index + 1; inner < nodes.length; inner += 1) {
       const b = nodes[inner]
 
-      if (a.distanceTo(b) < 2.75 && Math.random() > 0.42) {
+      if (a.distanceTo(b) < 3.25 && Math.random() > 0.28) {
         filamentPositions.push(a.x, a.y, a.z, b.x, b.y, b.z)
       }
     }
@@ -183,19 +215,34 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
   const filamentGeometry = new THREE.BufferGeometry()
   filamentGeometry.setAttribute("position", new THREE.Float32BufferAttribute(filamentPositions, 3))
   const filamentMaterial = new THREE.LineBasicMaterial({
-    color: amber,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.4,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   })
+  filamentMaterial.userData.tone = "hot"
   filamentGroup.add(new THREE.LineSegments(filamentGeometry, filamentMaterial))
+
+  const nodeGeometry = new THREE.BufferGeometry()
+  nodeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(nodes.flatMap((node) => [node.x, node.y, node.z]), 3))
+  const nodePoints = new THREE.Points(
+    nodeGeometry,
+    new THREE.PointsMaterial({
+      size: 0.18,
+      transparent: true,
+      opacity: 0.94,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  )
+  nodePoints.material.userData.tone = "hot"
+  filamentGroup.add(nodePoints)
 
   const particleCount = window.innerWidth < 720 ? 2200 : 4200
   const particlePositions = new Float32Array(particleCount * 3)
 
   for (let index = 0; index < particleCount; index += 1) {
-    const radius = 4 + Math.pow(Math.random(), 0.62) * 28
+    const radius = sphereRadius + 2 + Math.pow(Math.random(), 0.62) * 24
     const theta = Math.random() * Math.PI * 2
     const phi = Math.acos(Math.random() * 2 - 1)
     particlePositions[index * 3] = Math.sin(phi) * Math.cos(theta) * radius
@@ -208,7 +255,6 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
   const particles = new THREE.Points(
     particleGeometry,
     new THREE.PointsMaterial({
-      color: amber,
       size: 0.036,
       transparent: true,
       opacity: 0.58,
@@ -216,19 +262,78 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
       depthWrite: false,
     })
   )
+  particles.material.userData.tone = "base"
   particleGroup.add(particles)
 
-  const grid = new THREE.GridHelper(150, 54, deepAmber, amber)
-  grid.position.set(0, -14, -16)
+  const reflection = sphereGroup.clone(true)
+  reflection.scale.y = -0.28
+  reflection.position.y = -sphereRadius * 2.42
+  reflection.traverse((object) => {
+    if ("material" in object) {
+      const material = object.material
+      if (Array.isArray(material)) {
+        object.material = material.map((item) => item.clone())
+      } else if (material instanceof THREE.Material) {
+        object.material = material.clone()
+      }
+
+      const clonedMaterial = object.material
+      if (Array.isArray(clonedMaterial)) {
+        clonedMaterial.forEach((item) => {
+          item.opacity *= 0.18
+        })
+      } else if (clonedMaterial instanceof THREE.Material) {
+        clonedMaterial.opacity *= 0.18
+      }
+    }
+  })
+  core.add(reflection)
+
+  const grid = new THREE.GridHelper(150, 54, 0x7a2d00, 0xff8c00)
+  grid.position.set(0, -12.8, -14)
   grid.material.transparent = true
   grid.material.opacity = 0.12
+  if (!Array.isArray(grid.material)) grid.material.userData.tone = "deep"
   scene.add(grid)
 
-  const farGrid = new THREE.GridHelper(220, 44, deepAmber, amber)
+  const farGrid = new THREE.GridHelper(220, 44, 0x7a2d00, 0xff8c00)
   farGrid.position.set(0, -16, -38)
   farGrid.material.transparent = true
   farGrid.material.opacity = 0.045
+  if (!Array.isArray(farGrid.material)) farGrid.material.userData.tone = "deep"
   scene.add(farGrid)
+
+  function applyCoreColor(nextColor: DashboardCoreColor) {
+    const r = clampColorChannel(nextColor.r) / 255
+    const g = clampColorChannel(nextColor.g) / 255
+    const b = clampColorChannel(nextColor.b) / 255
+    coreAlpha = clampAlpha(nextColor.a)
+    coreColor.setRGB(r, g, b)
+    coreHotColor.copy(coreColor).lerp(new THREE.Color(1, 0.92, 0.62), 0.42)
+    coreDeepColor.copy(coreColor).lerp(new THREE.Color(0, 0, 0), 0.68)
+
+    scene.traverse((object) => {
+      if (!("material" in object)) return
+
+      const materials = Array.isArray(object.material) ? object.material : [object.material]
+      materials.forEach((material) => {
+        if (!(material instanceof THREE.Material) || !("color" in material)) return
+
+        const coloredMaterial = material as THREE.Material & { color: THREE.Color }
+        const tone = coloredMaterial.userData.tone
+
+        if (tone === "hot") {
+          coloredMaterial.color.copy(coreHotColor)
+        } else if (tone === "deep") {
+          coloredMaterial.color.copy(coreDeepColor)
+        } else {
+          coloredMaterial.color.copy(coreColor)
+        }
+      })
+    })
+  }
+
+  applyCoreColor(initialColor)
 
   const audioState: AudioState = {
     enabled: false,
@@ -332,7 +437,7 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
     camera.position.z = 34 + pointer.y * 0.9
     camera.lookAt(scene.position)
 
-    rings.forEach((ring, index) => {
+    sphereLines.forEach((ring, index) => {
       ring.rotation.z += ring.userData.speed * 0.01 * (1 + audioBoost * 2.7)
 
       if (index % 2 === 0) {
@@ -343,26 +448,29 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
 
       const material = ring.material
       if (!Array.isArray(material)) {
-        material.opacity = 0.42 + breathing * 0.42 + audioBoost * 0.18
+        material.opacity = Math.min(0.98, 0.2 + breathing * 0.34 + audioBoost * 0.14) * coreAlpha
       }
     })
 
     filamentGroup.rotation.z -= 0.0017 * (1 + audioBoost * 2.1)
     filamentGroup.rotation.y += 0.0011
-    filamentMaterial.opacity = 0.22 + breathing * 0.22 + audioBoost * 0.32
+    filamentMaterial.opacity = (0.22 + breathing * 0.22 + audioBoost * 0.32) * coreAlpha
+    nodePoints.material.opacity = (0.64 + breathing * 0.24 + audioBoost * 0.3) * coreAlpha
 
     nucleus.rotation.z += 0.006 * (1 + audioBoost * 2.4)
-    nucleus.material.opacity = 0.62 + breathing * 0.3 + audioBoost * 0.26
+    nucleus.material.opacity = (0.62 + breathing * 0.3 + audioBoost * 0.26) * coreAlpha
+    reflection.rotation.y = sphereGroup.rotation.y
+    reflection.rotation.z = sphereGroup.rotation.z
 
     particleGroup.rotation.y -= 0.0008 * (1 + audioBoost)
     particleGroup.rotation.x += 0.00035
-    particles.material.opacity = 0.38 + audioBoost * 0.32
+    particles.material.opacity = (0.38 + audioBoost * 0.32) * coreAlpha
 
     grid.position.z = Math.sin(elapsed * 0.45) * 2 - 2
     grid.position.x = pointer.x * -1.8
-    grid.material.opacity = 0.09 + audioBoost * 0.05
+    grid.material.opacity = (0.09 + audioBoost * 0.05) * coreAlpha
     farGrid.position.x = pointer.x * -3.2
-    farGrid.material.opacity = 0.035 + audioBoost * 0.035
+    farGrid.material.opacity = (0.035 + audioBoost * 0.035) * coreAlpha
 
     bloomPass.strength = 1.55 + breathing * 0.22 + audioBoost * 1.85
     bloomPass.radius = 0.18 + audioBoost * 0.08
@@ -385,6 +493,9 @@ export function createDashboardThreeCore(canvas: HTMLCanvasElement): DashboardTh
       } else {
         stopMicrophone()
       }
+    },
+    setColor(nextColor) {
+      applyCoreColor(nextColor)
     },
     dispose() {
       disposed = true
