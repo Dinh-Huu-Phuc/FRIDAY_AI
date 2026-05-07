@@ -1399,6 +1399,9 @@
 }
 
 .stark-ai-overlay {
+  --stark-core-rgb: 255, 193, 90;
+  --stark-core-alpha: 1;
+  --stark-core-color: rgba(var(--stark-core-rgb), var(--stark-core-alpha));
   position: fixed;
   inset: 0;
   z-index: 9999;
@@ -1409,8 +1412,8 @@
   opacity: 0;
   visibility: hidden;
   background:
-    radial-gradient(circle at 50% 42%, rgba(255, 177, 54, 0.22), transparent 26rem),
-    radial-gradient(circle at 50% 65%, rgba(255, 112, 0, 0.12), transparent 42rem),
+    radial-gradient(circle at 50% 42%, rgba(var(--stark-core-rgb), 0.22), transparent 26rem),
+    radial-gradient(circle at 50% 65%, rgba(var(--stark-core-rgb), 0.12), transparent 42rem),
     rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(20px) brightness(0.35);
   transition: opacity 0.22s ease, visibility 0.22s ease;
@@ -1458,23 +1461,80 @@
 
 .stark-ai-core-stage::before {
   background:
-    linear-gradient(180deg, rgba(255, 177, 54, 0.08), transparent 34%, rgba(0, 0, 0, 0.52)),
+    linear-gradient(180deg, rgba(var(--stark-core-rgb), 0.12), transparent 30%, rgba(0, 0, 0, 0.58)),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 5px);
   mix-blend-mode: screen;
-  opacity: 0.38;
+  opacity: 0.48;
 }
 
 .stark-ai-core-stage::after {
   background:
-    radial-gradient(circle at center, transparent 0 34%, rgba(0, 0, 0, 0.36) 72%, rgba(0, 0, 0, 0.88)),
+    linear-gradient(112deg, rgba(var(--stark-core-rgb), 0.08) 0 18%, transparent 18.2% 100%),
+    radial-gradient(circle at center, transparent 0 34%, rgba(0, 0, 0, 0.34) 72%, rgba(0, 0, 0, 0.9)),
     linear-gradient(90deg, rgba(0, 0, 0, 0.38), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.38));
+}
+
+.stark-ai-equation,
+.stark-ai-physics-readout {
+  position: absolute;
+  left: 50%;
+  z-index: 4;
+  transform: translateX(-50%);
+  color: color-mix(in srgb, var(--stark-core-color), white 34%);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  text-align: center;
+  text-shadow:
+    0 0 12px rgba(var(--stark-core-rgb), 0.86),
+    0 0 28px rgba(var(--stark-core-rgb), 0.48);
+  pointer-events: none;
+}
+
+.stark-ai-equation {
+  top: clamp(52px, 8vh, 96px);
+  width: min(680px, calc(100vw - 64px));
+  font-size: clamp(1.9rem, 4.5vw, 4.2rem);
+  line-height: 1;
+}
+
+.stark-ai-equation sup,
+.stark-ai-physics-readout sup {
+  font-size: 0.55em;
+  line-height: 0;
+}
+
+.stark-ai-physics-readout {
+  bottom: clamp(102px, 14vh, 152px);
+  display: flex;
+  width: min(760px, calc(100vw - 40px));
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: color-mix(in srgb, var(--stark-core-color), white 38%);
+  font-size: clamp(0.95rem, 2.1vw, 1.45rem);
+}
+
+.stark-ai-physics-readout span {
+  white-space: nowrap;
+}
+
+.stark-ai-physics-readout span + span {
+  position: relative;
+  padding-left: 16px;
+}
+
+.stark-ai-physics-readout span + span::before {
+  position: absolute;
+  left: -1px;
+  color: rgba(var(--stark-core-rgb), 0.72);
+  content: "|";
 }
 
 .stark-ai-overlay-label {
   position: absolute;
   left: 50%;
-  bottom: clamp(18px, 5vh, 54px);
-  z-index: 3;
+  bottom: clamp(18px, 5vh, 46px);
+  z-index: 4;
   display: grid;
   gap: 6px;
   min-width: min(420px, calc(100vw - 48px));
@@ -1485,18 +1545,85 @@
 }
 
 .stark-ai-overlay-label span {
-  color: #ffd7a1;
+  color: color-mix(in srgb, var(--stark-core-color), white 44%);
   font-size: 0.8rem;
-  text-shadow: 0 0 14px rgba(255, 140, 0, 0.85);
+  text-transform: uppercase;
+  text-shadow: 0 0 14px rgba(var(--stark-core-rgb), 0.85);
 }
 
 .stark-ai-overlay-label b {
-  color: #ff8c00;
+  color: var(--stark-core-color);
   font-size: clamp(1.5rem, 4vw, 3.4rem);
   font-weight: 400;
-  letter-spacing: 0;
-  text-shadow: 0 0 18px rgba(255, 140, 0, 0.9), 0 0 42px rgba(255, 140, 0, 0.6);
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 18px rgba(var(--stark-core-rgb), 0.9), 0 0 42px rgba(var(--stark-core-rgb), 0.6);
   animation: stark-listening-glow 0.9s ease-in-out infinite alternate;
+}
+
+.stark-ai-session-report {
+  max-width: min(760px, calc(100vw - 48px));
+  max-height: 96px;
+  margin: 6px auto 0;
+  overflow: hidden;
+  color: rgba(255, 248, 236, 0.86);
+  font-family: var(--font-geist-sans);
+  font-size: clamp(0.82rem, 1.3vw, 1rem);
+  line-height: 1.55;
+  text-shadow: 0 0 16px rgba(var(--stark-core-rgb), 0.42);
+}
+
+.stark-core-text-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  width: min(640px, calc(100vw - 48px));
+  margin: 14px auto 0;
+  pointer-events: auto;
+}
+
+.stark-core-text-input input,
+.stark-core-text-input button {
+  height: 42px;
+  min-width: 0;
+  border: 1px solid rgba(var(--stark-core-rgb), 0.58);
+  color: #fff8ec;
+  background: rgba(8, 4, 0, 0.82);
+  font: inherit;
+  outline: none;
+  box-shadow:
+    0 0 22px rgba(var(--stark-core-rgb), 0.18),
+    inset 0 0 18px rgba(var(--stark-core-rgb), 0.12);
+}
+
+.stark-core-text-input input {
+  padding: 0 14px;
+  font-size: 0.86rem;
+}
+
+.stark-core-text-input input::placeholder {
+  color: rgba(255, 248, 236, 0.72);
+  opacity: 1;
+}
+
+.stark-core-text-input input:focus {
+  border-color: rgba(var(--stark-core-rgb), 0.78);
+  box-shadow:
+    0 0 18px rgba(var(--stark-core-rgb), 0.16),
+    inset 0 0 16px rgba(var(--stark-core-rgb), 0.1);
+}
+
+.stark-core-text-input button {
+  padding: 0 16px;
+  color: color-mix(in srgb, var(--stark-core-color), white 42%);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stark-core-text-input button:disabled,
+.stark-core-text-input input:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .stark-overlay-close {
@@ -1504,12 +1631,158 @@
   top: 24px;
   right: 24px;
   z-index: 5;
-  border: 1px solid rgba(255, 140, 0, 0.55);
+  border: 1px solid rgba(var(--stark-core-rgb), 0.55);
   padding: 10px 14px;
-  color: #ffd7a1;
+  color: color-mix(in srgb, var(--stark-core-color), white 44%);
   background: rgba(8, 4, 0, 0.58);
-  box-shadow: 0 0 18px rgba(255, 140, 0, 0.28), inset 0 0 16px rgba(255, 140, 0, 0.08);
+  box-shadow: 0 0 18px rgba(var(--stark-core-rgb), 0.28), inset 0 0 16px rgba(var(--stark-core-rgb), 0.08);
   cursor: pointer;
+}
+
+.stark-core-color-picker {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 5;
+  display: grid;
+  width: min(360px, calc(100vw - 48px));
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(var(--stark-core-rgb), 0.42);
+  background: rgba(7, 5, 2, 0.68);
+  box-shadow:
+    0 0 24px rgba(var(--stark-core-rgb), 0.18),
+    inset 0 0 22px rgba(var(--stark-core-rgb), 0.08);
+  color: color-mix(in srgb, var(--stark-core-color), white 42%);
+  font-family: var(--font-geist-mono);
+  backdrop-filter: blur(14px);
+}
+
+.stark-core-color-picker__head,
+.stark-core-color-picker__row,
+.stark-core-alpha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stark-core-color-picker__head {
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.stark-core-color-picker__head span,
+.stark-core-swatch span,
+.stark-core-channel span,
+.stark-core-alpha span,
+.stark-core-alpha b {
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.stark-core-color-picker__head output {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stark-core-swatch,
+.stark-core-channel,
+.stark-core-alpha {
+  min-width: 0;
+}
+
+.stark-core-swatch,
+.stark-core-channel {
+  display: grid;
+  gap: 6px;
+}
+
+.stark-core-swatch {
+  flex: 0 0 58px;
+}
+
+.stark-core-swatch input {
+  width: 46px;
+  height: 32px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.stark-core-channel {
+  flex: 1 1 0;
+}
+
+.stark-core-channel input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(var(--stark-core-rgb), 0.28);
+  padding: 7px 8px;
+  color: #fff8ec;
+  background: rgba(0, 0, 0, 0.34);
+  font: inherit;
+}
+
+.stark-core-alpha input {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--stark-core-color);
+}
+
+.stark-core-alpha b {
+  width: 42px;
+  color: rgba(255, 255, 255, 0.78);
+  text-align: right;
+}
+
+@media (max-width: 720px) {
+  .stark-ai-equation {
+    top: 76px;
+    font-size: clamp(1.55rem, 9vw, 2.6rem);
+  }
+
+  .stark-ai-physics-readout {
+    bottom: 104px;
+    flex-wrap: wrap;
+    gap: 5px 10px;
+    font-size: 0.86rem;
+  }
+
+  .stark-ai-physics-readout span + span {
+    padding-left: 12px;
+  }
+
+  .stark-ai-overlay-label b {
+    font-size: clamp(1.35rem, 9vw, 2.25rem);
+    letter-spacing: 0.08em;
+  }
+
+  .stark-ai-session-report {
+    max-height: 78px;
+    font-size: 0.8rem;
+  }
+
+  .stark-core-text-input {
+    width: calc(100vw - 32px);
+  }
+
+  .stark-core-color-picker {
+    top: auto;
+    bottom: 16px;
+    left: 16px;
+    width: calc(100vw - 32px);
+  }
+
+  .stark-ai-overlay-label {
+    bottom: 154px;
+  }
 }
 
 @keyframes stark-radar-scan {
