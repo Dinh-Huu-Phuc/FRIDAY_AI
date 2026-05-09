@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from friday.log.paths import friday_save_log_dir
+
 from ..core.constants import (
     DEFAULT_ALPHA,
     DEFAULT_CHUNK_OVERLAP,
@@ -112,7 +114,7 @@ class TrainModelConfig:
 
     def __post_init__(self) -> None:
         if self.log_source_dir is None:
-            self.log_source_dir = self.module_dir.parent / "log" / "saveLog"
+            self.log_source_dir = friday_save_log_dir()
 
         if self.storage_dir is None:
             self.storage_dir = self.module_dir / "storage"

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import os
+import asyncio
 import unicodedata
 from functools import lru_cache
 
+from friday.about import match_about_response
 from friday.app.agent_console.routes import get_console_greeting, send_console_message
 from friday.app.agent_console.schemas import ConsoleChatRequest
 from friday.app.agent_console.service import get_agent_console_service
@@ -11,6 +13,7 @@ from friday.app.core_workspace import build_workspace_context
 from friday.config import config
 from friday.core.llm import OpenAICompatibleChatClient, StaticLLMClient
 from friday.core.schemas import ChatMessage, LLMRequest
+from friday.gmail_system_agent import check_unread_gmail_with_timeout, format_gmail_report
 from friday.news import NewsService
 
 
@@ -47,6 +50,22 @@ COMPUTER_COMMAND_TOKENS = (
     "inspect",
 )
 
+GMAIL_COMMAND_TOKENS = (
+    "check email",
+    "check gmail",
+    "read email",
+    "read gmail",
+    "gmail",
+    "email chua doc",
+    "email moi",
+    "doc email",
+    "doc gmail",
+    "kiem tra email",
+    "kiem tra gmail",
+    "check mail",
+    "inbox",
+)
+
 
 LLM_NOT_CONFIGURED_MESSAGE = (
     "I received your question, but the backend does not have OPENAI_API_KEY "
@@ -66,6 +85,11 @@ def _normalize_text(value: str) -> str:
 def _is_computer_command(message: str) -> bool:
     normalized = _normalize_text(message)
     return any(token in normalized for token in COMPUTER_COMMAND_TOKENS)
+
+
+def _is_gmail_command(message: str) -> bool:
+    normalized = _normalize_text(message)
+    return any(token in normalized for token in GMAIL_COMMAND_TOKENS)
 
 
 def _build_history_messages(session_id: str) -> list[ChatMessage]:
@@ -145,6 +169,20 @@ def _build_llm_error_message(exc: Exception) -> str:
 async def chat(payload: ConsoleChatRequest) -> dict:
     if _is_computer_command(payload.message):
         return send_console_message(payload)
+
+    about_match = match_about_response(payload.message, response_type="voice")
+    if about_match.matched:
+        return get_agent_console_service().send_assistant_reply(
+            payload,
+            assistant_content=about_match.response,
+        )
+
+    if _is_gmail_command(payload.message):
+        result = await check_unread_gmail_with_timeout()
+        return get_agent_console_service().send_assistant_reply(
+            payload,
+            assistant_content=format_gmail_report(result),
+        )
 
     history = _build_history_messages(payload.session_id)
     workspace_context = build_workspace_context(payload.message)

@@ -29,6 +29,7 @@ async function proxyRequest(
   const headers = new Headers()
   const contentType = request.headers.get("content-type")
   const accept = request.headers.get("accept")
+  const sttLanguage = request.headers.get("x-stt-language")
 
   if (contentType) {
     headers.set("content-type", contentType)
@@ -38,6 +39,10 @@ async function proxyRequest(
     headers.set("accept", accept)
   }
 
+  if (sttLanguage) {
+    headers.set("x-stt-language", sttLanguage)
+  }
+
   const init: RequestInit = {
     method: request.method,
     headers,
@@ -45,7 +50,7 @@ async function proxyRequest(
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
-    init.body = await request.text()
+    init.body = await request.arrayBuffer()
   }
 
   try {

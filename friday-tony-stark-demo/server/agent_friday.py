@@ -23,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+from friday.about import match_about_response
 from friday.app.computer.dependencies import get_computer_service
 from friday.app.computer.schemas.requests import RunRequest
 from friday.app.computer.schemas.responses import RunResponse
@@ -30,6 +31,7 @@ from friday.app.windows_launcher.service import open_app as open_windows_app
 from friday.app import open_social_platform, resolve_social_platform
 from friday.config import config
 from friday.googleServiceCloud.credentials import ensure_google_application_credentials
+from friday.gmail_system_agent import check_unread_gmail_with_timeout, format_gmail_report
 from friday.log import DailyInteractionLogger
 from friday.messages.promt_agent_friday import build_daily_briefing_runtime_hint, build_startup_greeting
 from friday.news import NewsService
@@ -39,7 +41,7 @@ from friday.runtime_context import resolve_runtime_location
 from friday.search import get_weather_snapshot
 from friday.trainModel import BatchTrainingScheduler, ConversationDatasetStore, TrainModelConfig
 from friday.trainModel.memory import MemoryManager
-from livekit.agents import JobContext, WorkerOptions, cli
+from livekit.agents import JobContext, StopResponse, WorkerOptions, cli
 from livekit.agents.llm import mcp
 from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import deepgram, google as lk_google, openai as lk_openai, sarvam, silero
@@ -148,6 +150,11 @@ def _get_windows_host_ip() -> str:
 
 
 def _mcp_server_url() -> str:
+    configured_url = os.getenv("MCP_SERVER_URL", "").strip()
+    if configured_url:
+        logger.info("MCP Server URL: %s", configured_url)
+        return configured_url
+
     # host_ip = _get_windows_host_ip()
     # url = f"http://{host_ip}:{MCP_SERVER_PORT}/sse"
     # url = f"https://ongoing-colleague-samba-pioneer.trycloudflare.com/sse"
@@ -172,6 +179,10 @@ DAILY_BRIEFING_PATTERN = re.compile(
     r"\b(briefing|báo nhanh|báo cáo nhanh|bắt đầu ngày|đầu ngày|đầu phiên|tóm tắt hôm nay|hôm nay có gì|việc đang dở)\b",
     re.IGNORECASE,
 )
+GMAIL_CHECK_PATTERN = re.compile(
+    r"\b(check\s*(email|gmail|mail)|read\s*(email|gmail|mail)|gmail|inbox|kiểm\s*tra\s*(email|gmail|mail)|kiem\s*tra\s*(email|gmail|mail)|đọc\s*(email|gmail|mail)|doc\s*(email|gmail|mail)|email\s*(chưa|chua)\s*đọc|email\s*mới|email\s*moi)\b",
+    re.IGNORECASE,
+)
 
 
 def _is_social_open_request(text: str) -> bool:
@@ -188,6 +199,28 @@ def _is_daily_briefing_request(text: str) -> bool:
     if not candidate:
         return False
     return bool(DAILY_BRIEFING_PATTERN.search(candidate))
+
+
+def _is_gmail_check_request(text: str) -> bool:
+    candidate = str(text or "").strip()
+    if not candidate:
+        return False
+    return bool(GMAIL_CHECK_PATTERN.search(candidate))
+
+
+def _build_gmail_runtime_hint(*, command: str, report: str) -> str:
+    compact_report = re.sub(r"\s+", " ", report).strip()
+    if len(compact_report) > 2200:
+        compact_report = f"{compact_report[:2200].rstrip()}..."
+    return (
+        "[GMAIL_CONTEXT]\n"
+        f"command={command}\n"
+        f"assistant_reply={compact_report}\n"
+        "The Gmail readonly check has already been executed in runtime.\n"
+        "Assistant reply for this turn must be exactly assistant_reply, in Vietnamese.\n"
+        "Do not call Gmail, email, web, or other tools for this turn.\n"
+        "Do not mention tool names, API scopes, token files, or implementation details."
+    )
 
 
 def _extract_windows_app_query(text: str) -> str:
@@ -441,12 +474,37 @@ class FridayAgent(Agent):
         if _is_daily_briefing_request(refined_user_text):
             daily_briefing_hint = build_daily_briefing_runtime_hint()
 
+        about_match = match_about_response(refined_user_text, response_type="voice")
+        if not social_open_result and about_match.matched:
+            logger.info(
+                "About self-intro detected document=%s text='%s'",
+                about_match.document_id,
+                refined_user_text[:160],
+            )
+            await self.session.say(about_match.response, add_to_chat_ctx=True)
+            raise StopResponse()
+
+        gmail_hint = ""
+        if not social_open_result and _is_gmail_check_request(refined_user_text):
+            gmail_result = await check_unread_gmail_with_timeout()
+            gmail_report = format_gmail_report(gmail_result)
+            logger.info(
+                "Gmail check detected ok=%s unread=%s reported=%s skipped=%s text='%s'",
+                gmail_result.ok,
+                gmail_result.unread_count,
+                gmail_result.reported_count,
+                gmail_result.skipped_count,
+                refined_user_text[:160],
+            )
+            await self.session.say(gmail_report, add_to_chat_ctx=True)
+            raise StopResponse()
+
         news_status = "not_news"
         news_topic: str | None = None
         news_country: str | None = None
         news_count = 0
         news_context = ""
-        if not social_open_result and self._news_service is not None:
+        if not social_open_result and not gmail_hint and self._news_service is not None:
             try:
                 news_result = await asyncio.to_thread(
                     self._news_service.handle_user_query,
@@ -496,6 +554,8 @@ class FridayAgent(Agent):
                 new_message.content = [f"{windows_launcher_hint}\n\n[CURRENT_USER_MESSAGE]\n{refined_user_text}"]
             elif daily_briefing_hint:
                 new_message.content = [f"{daily_briefing_hint}\n\n[CURRENT_USER_MESSAGE]\n{refined_user_text}"]
+            elif gmail_hint:
+                new_message.content = [f"{gmail_hint}\n\n[CURRENT_USER_MESSAGE]\n{refined_user_text}"]
             elif news_context:
                 new_message.content = [f"{news_context}\n\n[CURRENT_USER_MESSAGE]\n{refined_user_text}"]
             else:
@@ -519,6 +579,8 @@ class FridayAgent(Agent):
             composed_parts.append(windows_launcher_hint.strip())
         elif daily_briefing_hint:
             composed_parts.append(daily_briefing_hint.strip())
+        elif gmail_hint:
+            composed_parts.append(gmail_hint.strip())
         elif news_context:
             composed_parts.append(news_context.strip())
         composed_parts.append(f"[CURRENT_USER_MESSAGE]\n{refined_user_text}")
@@ -538,6 +600,7 @@ class FridayAgent(Agent):
         new_message.extra["social_open_result"] = social_open_result
         new_message.extra["windows_launcher_used"] = bool(windows_launcher_hint)
         new_message.extra["daily_briefing_requested"] = bool(daily_briefing_hint)
+        new_message.extra["gmail_check_requested"] = bool(gmail_hint)
 
     def bind_pending_turns(self, queue: deque[dict[str, str | bool | None]]) -> None:
         self._pending_user_turns = queue

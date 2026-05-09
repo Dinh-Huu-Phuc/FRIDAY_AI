@@ -6,6 +6,8 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 type DashboardThreeCore = {
   dispose: () => void
   setActive: (active: boolean) => void
+  setAudioElement: (audioElement: HTMLAudioElement | null) => void
+  setSyntheticSpeech: (speaking: boolean) => void
   setColor: (color: DashboardCoreColor) => void
 }
 
@@ -16,6 +18,11 @@ type AudioState = {
   data: Uint8Array<ArrayBuffer> | null
   stream: MediaStream | null
   context: AudioContext | null
+  mediaElement: HTMLAudioElement | null
+  mediaElementSource: MediaElementAudioSourceNode | null
+  mediaElementCleanup: (() => void) | null
+  syntheticSpeech: boolean
+  syntheticPhase: number
 }
 
 export type DashboardCoreColor = {
@@ -74,6 +81,7 @@ export function createDashboardThreeCore(
   let disposed = false
   let active = false
   let coreAlpha = clampAlpha(initialColor.a)
+  let microphoneRequestId = 0
 
   renderer.setPixelRatio(window.devicePixelRatio || 1)
   renderer.setSize(window.innerWidth, window.innerHeight)
@@ -342,9 +350,24 @@ export function createDashboardThreeCore(
     data: null,
     stream: null,
     context: null,
+    mediaElement: null,
+    mediaElementSource: null,
+    mediaElementCleanup: null,
+    syntheticSpeech: false,
+    syntheticPhase: 0,
   }
 
   function updateAudioLevel() {
+    if (audioState.syntheticSpeech && !audioState.analyser) {
+      audioState.syntheticPhase += 0.22
+      const pulse =
+        0.34 +
+        Math.max(0, Math.sin(audioState.syntheticPhase)) * 0.34 +
+        Math.max(0, Math.sin(audioState.syntheticPhase * 2.7)) * 0.18
+      audioState.level += (pulse - audioState.level) * 0.18
+      return
+    }
+
     if (!audioState.analyser || !audioState.data) {
       audioState.level *= 0.94
       return
@@ -362,24 +385,39 @@ export function createDashboardThreeCore(
   }
 
   async function startMicrophone() {
-    if (!navigator.mediaDevices?.getUserMedia || audioState.enabled) return
+    if (!navigator.mediaDevices?.getUserMedia || audioState.enabled || audioState.mediaElement) return
+
+    const requestId = ++microphoneRequestId
+    let stream: MediaStream | null = null
 
     try {
-      audioState.stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-      audioState.context = new AudioContext()
-      const source = audioState.context.createMediaStreamSource(audioState.stream)
-      audioState.analyser = audioState.context.createAnalyser()
-      audioState.analyser.fftSize = 512
-      audioState.analyser.smoothingTimeConstant = 0.78
-      audioState.data = new Uint8Array(audioState.analyser.frequencyBinCount)
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+
+      if (disposed || !active || requestId !== microphoneRequestId || audioState.mediaElement) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+
+      const context = new AudioContext()
+      const source = context.createMediaStreamSource(stream)
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 512
+      analyser.smoothingTimeConstant = 0.78
+      audioState.stream = stream
+      audioState.context = context
+      audioState.analyser = analyser
+      audioState.data = new Uint8Array(analyser.frequencyBinCount)
       source.connect(audioState.analyser)
       audioState.enabled = true
     } catch {
+      stream?.getTracks().forEach((track) => track.stop())
       audioState.level = 0.24
     }
   }
 
   function stopMicrophone() {
+    microphoneRequestId += 1
+    audioState.mediaElementCleanup?.()
     audioState.stream?.getTracks().forEach((track) => track.stop())
     void audioState.context?.close().catch(() => null)
     audioState.enabled = false
@@ -387,7 +425,65 @@ export function createDashboardThreeCore(
     audioState.data = null
     audioState.stream = null
     audioState.context = null
+    audioState.mediaElement = null
+    audioState.mediaElementSource = null
+    audioState.mediaElementCleanup = null
+    audioState.syntheticSpeech = false
     audioState.level = 0
+  }
+
+  function setAudioElement(audioElement: HTMLAudioElement | null) {
+    if (audioState.mediaElement === audioElement) return
+
+    stopMicrophone()
+
+    if (!audioElement) {
+      if (active) void startMicrophone()
+      return
+    }
+
+    try {
+      const context = new AudioContext()
+      const source = context.createMediaElementSource(audioElement)
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 512
+      analyser.smoothingTimeConstant = 0.68
+
+      source.connect(analyser)
+      analyser.connect(context.destination)
+
+      const cleanup = () => {
+        audioElement.removeEventListener("ended", handleEnded)
+        audioElement.removeEventListener("pause", handleEnded)
+      }
+      const handleEnded = () => {
+        if (audioState.mediaElement === audioElement && audioElement.ended) {
+          setAudioElement(null)
+        }
+      }
+
+      audioElement.addEventListener("ended", handleEnded)
+      audioElement.addEventListener("pause", handleEnded)
+
+      audioState.enabled = true
+      audioState.context = context
+      audioState.analyser = analyser
+      audioState.data = new Uint8Array(analyser.frequencyBinCount)
+      audioState.mediaElement = audioElement
+      audioState.mediaElementSource = source
+      audioState.mediaElementCleanup = cleanup
+      audioState.level = Math.max(audioState.level, 0.22)
+      void context.resume().catch(() => null)
+    } catch {
+      audioState.level = 0.28
+    }
+  }
+
+  function setSyntheticSpeech(speaking: boolean) {
+    audioState.syntheticSpeech = speaking
+    if (speaking) {
+      audioState.level = Math.max(audioState.level, 0.28)
+    }
   }
 
   function resize() {
@@ -497,6 +593,8 @@ export function createDashboardThreeCore(
     setColor(nextColor) {
       applyCoreColor(nextColor)
     },
+    setAudioElement,
+    setSyntheticSpeech,
     dispose() {
       disposed = true
       cancelAnimationFrame(animationFrame)
