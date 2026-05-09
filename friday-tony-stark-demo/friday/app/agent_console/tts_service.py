@@ -53,7 +53,7 @@ def _build_tts(provider: str):
             voice=os.getenv("OPENAI_TTS_VOICE", "nova"),
             speed=DEFAULT_TTS_SPEED,
             api_key=os.getenv("OPENAI_API_KEY") or None,
-            response_format="wav",
+            response_format=os.getenv("OPENAI_TTS_RESPONSE_FORMAT", "pcm"),
         )
 
     raise ValueError(f"Unsupported TTS provider: {provider!r}")

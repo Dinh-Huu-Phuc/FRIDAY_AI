@@ -9,6 +9,8 @@ from typing import Any
 
 from livekit.agents.llm import ChatMessage, FunctionCall, FunctionCallOutput
 
+from friday.log.paths import friday_save_log_dir
+
 
 class DailyInteractionLogger:
     """Persist agent and user interaction events into a daily JSON file."""
@@ -33,8 +35,7 @@ class DailyInteractionLogger:
         save_dir: str | Path | None = None,
         tzinfo: tzinfo | None = None,
     ) -> None:
-        base_dir = Path(__file__).resolve().parents[1]
-        self._save_dir = Path(save_dir) if save_dir else base_dir / "saveLog"
+        self._save_dir = Path(save_dir) if save_dir else friday_save_log_dir()
         self._save_dir.mkdir(parents=True, exist_ok=True)
 
         self._tzinfo = tzinfo or datetime.now().astimezone().tzinfo or timezone.utc

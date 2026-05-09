@@ -1,0 +1,76 @@
+services:
+  friday-api:
+    build:
+      context: ./friday-tony-stark-demo
+    env_file:
+      - ./friday-tony-stark-demo/.env
+    environment:
+      FRIDAY_ENV: production
+      FRIDAY_API_HOST: 0.0.0.0
+      FRIDAY_API_PORT: 8001
+      FRIDAY_CORS_ORIGINS: http://localhost:3000,http://localhost:3004
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  friday-mcp:
+    build:
+      context: ./friday-tony-stark-demo
+    env_file:
+      - ./friday-tony-stark-demo/.env
+    environment:
+      FRIDAY_ENV: production
+      FRIDAY_MCP_HOST: 0.0.0.0
+      FRIDAY_MCP_PORT: 8000
+      FRIDAY_SPATIAL_API_BASE_URL: http://friday-api:8001/api/v1/spatial
+    ports:
+      - "8000:8000"
+    depends_on:
+      - friday-api
+    restart: unless-stopped
+
+  friday-voice:
+    build:
+      context: ./friday-tony-stark-demo
+    profiles:
+      - voice
+    env_file:
+      - ./friday-tony-stark-demo/.env
+    environment:
+      FRIDAY_ENV: production
+      MCP_SERVER_URL: http://friday-mcp:8000/sse
+    command: ["uv", "run", "friday_voice"]
+    depends_on:
+      - friday-mcp
+    restart: unless-stopped
+
+  friday-platform:
+    build:
+      context: ./keyApis/FRIDAY_PLATFORM
+      args:
+        NEXT_PUBLIC_APP_NAME: FRIDAY Platform
+    environment:
+      BACKEND_URL: http://friday-api:8001
+      NEXT_PUBLIC_APP_NAME: FRIDAY Platform
+    ports:
+      - "3004:3000"
+    depends_on:
+      - friday-api
+    restart: unless-stopped
+
+  page-client:
+    build:
+      context: ./pageClient
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://friday-api:8001
+        NEXT_PUBLIC_FRIDAY_PLATFORM_URL: http://localhost:3004/friday-platform
+    environment:
+      BACKEND_URL: http://friday-api:8001
+      NEXT_PUBLIC_API_BASE_URL: http://friday-api:8001
+      NEXT_PUBLIC_FRIDAY_PLATFORM_URL: http://localhost:3004/friday-platform
+    ports:
+      - "3000:3000"
+    depends_on:
+      - friday-api
+      - friday-platform
+    restart: unless-stopped

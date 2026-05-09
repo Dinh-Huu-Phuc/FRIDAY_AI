@@ -151,7 +151,7 @@ venv.bak/
 friday/googleServiceCloud/*.json
 
 # Runtime logs / generated data
-friday/log/saveLog/*.json
+friday/log/saveLog/
 friday/trainModel/storage/
 
 # Spyder project settings
@@ -196,3 +196,8 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+
+friday/gmail_system_agent/json/
+friday/log/save_read_gmail/
+friday/about/messages/

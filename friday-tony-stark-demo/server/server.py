@@ -4,6 +4,7 @@ Run with: python server/server.py
 """
 
 import json
+import os
 
 import anyio
 import uvicorn
@@ -194,8 +195,8 @@ async def _run_sse() -> None:
     app = mcp.sse_app()
     config = uvicorn.Config(
         app,
-        host=mcp.settings.host,
-        port=mcp.settings.port,
+        host=os.getenv("FRIDAY_MCP_HOST", mcp.settings.host),
+        port=int(os.getenv("FRIDAY_MCP_PORT", str(mcp.settings.port))),
         log_level=mcp.settings.log_level.lower(),
         http="h11",
     )

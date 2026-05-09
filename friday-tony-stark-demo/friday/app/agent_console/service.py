@@ -10,7 +10,7 @@ from typing import Any
 from friday.app.agent_console.schemas import ConsoleChatRequest, ConsoleMessage, ConsoleState
 from friday.app.computer.router.routes import observe_computer, plan_computer, run_computer_cycle
 from friday.app.computer.schemas.requests import ObserveRequest, PlanRequest, RunRequest
-from friday.log import DailyInteractionLogger
+from friday.log import DailyInteractionLogger, friday_save_log_dir
 from friday.runtime_context import get_computer_runtime_context
 from friday.trainModel import ConversationDatasetStore, TrainModelConfig
 
@@ -23,7 +23,7 @@ class AgentConsoleService:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._module_dir = Path(__file__).resolve().parent
-        self._log_dir = self._module_dir.parents[2] / "log" / "saveLog" / "agent_console"
+        self._log_dir = friday_save_log_dir("agent_console")
         self._log_dir.mkdir(parents=True, exist_ok=True)
         self._state_path = self._log_dir / "console_state.json"
         self._turn_log_path = self._log_dir / "conversation_turns.jsonl"
