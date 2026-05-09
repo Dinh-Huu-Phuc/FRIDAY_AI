@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { DashboardBackground } from "@/components/dashboard/dashboard-background"
 import { createDashboardThreeCore, type DashboardCoreColor } from "@/components/dashboard/js/dashboard-three-core"
 
@@ -11,6 +11,7 @@ type BrowserSpeechRecognition = {
   continuous: boolean
   interimResults: boolean
   lang: string
+  maxAlternatives: number
   onresult: ((event: SpeechRecognitionEvent) => void) | null
   onend: (() => void) | null
   onerror: (() => void) | null
@@ -25,12 +26,28 @@ type SpeechRecognitionEvent = {
   results: {
     length: number
     [index: number]: {
+      length: number
       isFinal: boolean
       [index: number]: {
         transcript: string
+        confidence?: number
       }
     }
   }
+}
+
+type VoiceTranscriptCandidate = {
+  transcript: string
+  confidence: number
+}
+
+type CoreSttResponse = {
+  ok?: boolean
+  message?: string
+  raw_text?: string
+  refined_text?: string
+  provider?: string
+  model?: string
 }
 
 const copy = {
@@ -176,6 +193,111 @@ function channelToHex(value: number) {
 
 function coreColorToHex(color: DashboardCoreColor) {
   return `#${channelToHex(color.r)}${channelToHex(color.g)}${channelToHex(color.b)}`
+}
+
+function hueToCoreColor(hue: number, alpha: number): DashboardCoreColor {
+  const chroma = 1
+  const huePrime = ((hue % 360) + 360) % 360 / 60
+  const x = chroma * (1 - Math.abs((huePrime % 2) - 1))
+  const [red, green, blue] =
+    huePrime < 1
+      ? [chroma, x, 0]
+      : huePrime < 2
+        ? [x, chroma, 0]
+        : huePrime < 3
+          ? [0, chroma, x]
+          : huePrime < 4
+            ? [0, x, chroma]
+            : huePrime < 5
+              ? [x, 0, chroma]
+              : [chroma, 0, x]
+
+  return {
+    r: Math.round((red * 0.78 + 0.22) * 255),
+    g: Math.round((green * 0.78 + 0.22) * 255),
+    b: Math.round((blue * 0.78 + 0.22) * 255),
+    a: alpha,
+  }
+}
+
+function normalizeVoiceText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function scoreVoiceCandidate(candidate: VoiceTranscriptCandidate) {
+  const normalized = normalizeVoiceText(candidate.transcript)
+  const tokens = new Set(normalized.split(" ").filter(Boolean))
+  let score = Number.isFinite(candidate.confidence) ? candidate.confidence * 3 : 0
+
+  const vietnameseIntentWords = [
+    "tin",
+    "tức",
+    "hôm",
+    "nay",
+    "Việt",
+    "Nam",
+    "thế",
+    "giới",
+    "báo",
+    "cáo",
+    "thời",
+    "tiết",
+    "Đà",
+    "Lạt",
+    "mở",
+    "quan",
+    "sát",
+  ]
+
+  vietnameseIntentWords.forEach((word) => {
+    if (tokens.has(word)) score += 2
+  })
+
+  if (normalized.includes("tin tức")) score += 8
+  if (normalized.includes("hôm nay")) score += 5
+  if (normalized.includes("thời tiết")) score += 5
+  if (normalized.includes("quan sát màn hình")) score += 5
+  if (/^(task|talk to|doc sach)\b/.test(normalized)) score -= 8
+  if (/^\d+$/.test(normalized)) score -= 6
+
+  return score
+}
+
+function chooseVoiceTranscript(candidates: VoiceTranscriptCandidate[]) {
+  const cleanedCandidates = candidates
+    .map((candidate) => ({
+      transcript: candidate.transcript.replace(/\s+/g, " ").trim(),
+      confidence: candidate.confidence,
+    }))
+    .filter((candidate) => candidate.transcript)
+
+  if (!cleanedCandidates.length) return ""
+
+  return [...cleanedCandidates].sort((left, right) => scoreVoiceCandidate(right) - scoreVoiceCandidate(left))[0].transcript
+}
+
+function isSuspiciousVoiceTranscript(transcript: string) {
+  const normalized = normalizeVoiceText(transcript)
+  return /^(task|talk to)\s+\d+$/.test(normalized) || normalized === "doc sach" || /^\d+$/.test(normalized)
+}
+
+function resolveRecorderMimeType() {
+  if (typeof MediaRecorder === "undefined") return ""
+
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+    "audio/mp4",
+  ]
+
+  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? ""
 }
 
 function hexToCoreColor(hex: string, alpha: number): DashboardCoreColor {
@@ -378,6 +500,7 @@ export function StarkNeuralDashboard() {
   const [locale, setLocale] = useState<Locale>("en")
   const [overlayActive, setOverlayActive] = useState(false)
   const [coreColor, setCoreColor] = useState<DashboardCoreColor>(DEFAULT_CORE_COLOR)
+  const [rainbowCoreEnabled, setRainbowCoreEnabled] = useState(false)
   const [coreSessionState, setCoreSessionState] = useState<CoreSessionState>("idle")
   const [coreReport, setCoreReport] = useState("")
   const [coreTextInput, setCoreTextInput] = useState("")
@@ -388,16 +511,73 @@ export function StarkNeuralDashboard() {
   const greetingAbortRef = useRef<AbortController | null>(null)
   const ttsAbortRef = useRef<AbortController | null>(null)
   const chatAbortRef = useRef<AbortController | null>(null)
+  const sttAbortRef = useRef<AbortController | null>(null)
   const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const voiceStreamRef = useRef<MediaStream | null>(null)
+  const voiceAudioContextRef = useRef<AudioContext | null>(null)
   const coreTextSubmitRef = useRef<((message: string) => void) | null>(null)
   const coreAudioRef = useRef<HTMLAudioElement | null>(null)
   const coreAudioUrlRef = useRef<string | null>(null)
+  const coreSessionVersionRef = useRef(0)
   const t = copy[locale]
   const coreColorHex = useMemo(() => coreColorToHex(coreColor), [coreColor])
   const coreColorCss = useMemo(
     () => `rgba(${coreColor.r}, ${coreColor.g}, ${coreColor.b}, ${coreColor.a})`,
     [coreColor]
   )
+
+  const disconnectCoreSession = useCallback(() => {
+    coreSessionVersionRef.current += 1
+    greetingAbortRef.current?.abort()
+    greetingAbortRef.current = null
+    ttsAbortRef.current?.abort()
+    ttsAbortRef.current = null
+    chatAbortRef.current?.abort()
+    chatAbortRef.current = null
+    sttAbortRef.current?.abort()
+    sttAbortRef.current = null
+
+    speechRecognitionRef.current?.abort()
+    speechRecognitionRef.current = null
+
+    const recorder = mediaRecorderRef.current
+    mediaRecorderRef.current = null
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop()
+      } catch {
+        // The recorder may already be stopping.
+      }
+    }
+
+    voiceStreamRef.current?.getTracks().forEach((track) => track.stop())
+    voiceStreamRef.current = null
+
+    if (voiceAudioContextRef.current) {
+      const audioContext = voiceAudioContextRef.current
+      voiceAudioContextRef.current = null
+      void audioContext.close().catch(() => null)
+    }
+
+    threeCoreRef.current?.setActive(false)
+    threeCoreRef.current?.setAudioElement(null)
+    threeCoreRef.current?.setSyntheticSpeech(false)
+
+    coreAudioRef.current?.pause()
+    coreAudioRef.current = null
+
+    if (coreAudioUrlRef.current) {
+      URL.revokeObjectURL(coreAudioUrlRef.current)
+      coreAudioUrlRef.current = null
+    }
+
+    window.speechSynthesis?.cancel()
+    coreTextSubmitRef.current = null
+    setCoreSessionState("idle")
+    setCoreReport("")
+    setOverlayActive(false)
+  }, [])
 
   useEffect(() => {
     const initialize = window.setTimeout(() => {
@@ -473,13 +653,40 @@ export function StarkNeuralDashboard() {
   }, [overlayActive])
 
   useEffect(() => {
+    function stopCoreVoiceCapture() {
+      sttAbortRef.current?.abort()
+      sttAbortRef.current = null
+      speechRecognitionRef.current?.abort()
+      speechRecognitionRef.current = null
+
+      const recorder = mediaRecorderRef.current
+      mediaRecorderRef.current = null
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.stop()
+        } catch {
+          // The recorder may already be stopping.
+        }
+      }
+
+      voiceStreamRef.current?.getTracks().forEach((track) => track.stop())
+      voiceStreamRef.current = null
+
+      if (voiceAudioContextRef.current) {
+        const audioContext = voiceAudioContextRef.current
+        voiceAudioContextRef.current = null
+        void audioContext.close().catch(() => null)
+      }
+    }
+
     if (!overlayActive) {
       greetingAbortRef.current?.abort()
       ttsAbortRef.current?.abort()
       chatAbortRef.current?.abort()
-      speechRecognitionRef.current?.abort()
-      speechRecognitionRef.current = null
+      stopCoreVoiceCapture()
       coreTextSubmitRef.current = null
+      threeCoreRef.current?.setAudioElement(null)
+      threeCoreRef.current?.setSyntheticSpeech(false)
       coreAudioRef.current?.pause()
       coreAudioRef.current = null
 
@@ -495,19 +702,28 @@ export function StarkNeuralDashboard() {
     let cancelled = false
     let shouldListen = false
     let handlingTranscript = false
+    const sessionVersion = coreSessionVersionRef.current
+    const isSessionStopped = () => cancelled || coreSessionVersionRef.current !== sessionVersion
     const greetingController = new AbortController()
     greetingAbortRef.current = greetingController
 
     async function speakWithBrowserFallback(text: string) {
-      if (!window.speechSynthesis || cancelled) return
+      if (!window.speechSynthesis || isSessionStopped()) return
 
       await new Promise<void>((resolve) => {
         const utterance = new SpeechSynthesisUtterance(text)
         utterance.lang = locale === "vi" ? "vi-VN" : "en-US"
         utterance.rate = 1
         utterance.pitch = 1
-        utterance.onend = () => resolve()
-        utterance.onerror = () => resolve()
+        utterance.onstart = () => threeCoreRef.current?.setSyntheticSpeech(true)
+        utterance.onend = () => {
+          threeCoreRef.current?.setSyntheticSpeech(false)
+          resolve()
+        }
+        utterance.onerror = () => {
+          threeCoreRef.current?.setSyntheticSpeech(false)
+          resolve()
+        }
         window.speechSynthesis.cancel()
         window.speechSynthesis.speak(utterance)
       })
@@ -530,7 +746,7 @@ export function StarkNeuralDashboard() {
       }
 
       const audioBlob = await response.blob()
-      if (cancelled) return
+      if (isSessionStopped()) return
 
       if (coreAudioUrlRef.current) URL.revokeObjectURL(coreAudioUrlRef.current)
       const audioUrl = URL.createObjectURL(audioBlob)
@@ -538,10 +754,17 @@ export function StarkNeuralDashboard() {
 
       const audio = new Audio(audioUrl)
       coreAudioRef.current = audio
+      threeCoreRef.current?.setAudioElement(audio)
 
       await new Promise<void>((resolve, reject) => {
-        audio.onended = () => resolve()
-        audio.onerror = () => reject(new Error("Audio playback failed."))
+        audio.onended = () => {
+          threeCoreRef.current?.setAudioElement(null)
+          resolve()
+        }
+        audio.onerror = () => {
+          threeCoreRef.current?.setAudioElement(null)
+          reject(new Error("Audio playback failed."))
+        }
         audio.play().catch(reject)
       })
     }
@@ -560,8 +783,31 @@ export function StarkNeuralDashboard() {
       return String(assistantMessage?.content ?? "").trim()
     }
 
-    function startListening() {
-      if (cancelled || handlingTranscript) return
+    async function uploadCoreAudioForTranscript(audioBlob: Blob) {
+      const sttController = new AbortController()
+      sttAbortRef.current = sttController
+
+      const response = await fetch("/api/backend/agent/stt", {
+        method: "POST",
+        headers: {
+          "Content-Type": audioBlob.type || "audio/webm",
+          "x-stt-language": locale === "vi" ? "vi" : "en",
+        },
+        body: audioBlob,
+        cache: "no-store",
+        signal: sttController.signal,
+      })
+
+      const payload = (await response.json().catch(() => ({}))) as CoreSttResponse
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.message || `STT failed with status ${response.status}`)
+      }
+
+      return String(payload.refined_text || payload.raw_text || "").trim()
+    }
+
+    function startBrowserSpeechRecognition() {
+      if (isSessionStopped() || handlingTranscript) return
 
       const SpeechRecognitionConstructor =
         (window as typeof window & {
@@ -574,7 +820,7 @@ export function StarkNeuralDashboard() {
 
       if (!SpeechRecognitionConstructor) {
         setCoreSessionState("error")
-        setCoreReport("Speech recognition is not available in this browser. Use Chrome, or add backend STT for this Core AI session.")
+        setCoreReport("Core AI needs backend STT or browser speech recognition before it can listen.")
         return
       }
 
@@ -583,22 +829,31 @@ export function StarkNeuralDashboard() {
       recognition.continuous = false
       recognition.interimResults = false
       recognition.lang = locale === "vi" ? "vi-VN" : "en-US"
+      recognition.maxAlternatives = 5
 
       recognition.onresult = (event) => {
-        let transcript = ""
+        const candidates: VoiceTranscriptCandidate[] = []
         for (let index = 0; index < event.results.length; index += 1) {
           const result = event.results[index]
-          if (result.isFinal) transcript += result[0]?.transcript ?? ""
+          if (!result.isFinal) continue
+
+          for (let alternativeIndex = 0; alternativeIndex < result.length; alternativeIndex += 1) {
+            const alternative = result[alternativeIndex]
+            candidates.push({
+              transcript: alternative?.transcript ?? "",
+              confidence: alternative?.confidence ?? 0,
+            })
+          }
         }
 
-        const normalizedTranscript = transcript.trim()
+        const normalizedTranscript = chooseVoiceTranscript(candidates)
         if (normalizedTranscript) {
-          void handleTranscript(normalizedTranscript)
+          void handleTranscript(normalizedTranscript, "voice")
         }
       }
 
       recognition.onend = () => {
-        if (!cancelled && shouldListen && !handlingTranscript) {
+        if (!isSessionStopped() && shouldListen && !handlingTranscript) {
           window.setTimeout(() => {
             try {
               recognition.start()
@@ -610,7 +865,7 @@ export function StarkNeuralDashboard() {
       }
 
       recognition.onerror = () => {
-        if (!cancelled && shouldListen && !handlingTranscript) {
+        if (!isSessionStopped() && shouldListen && !handlingTranscript) {
           setCoreSessionState("listening")
         }
       }
@@ -625,14 +880,177 @@ export function StarkNeuralDashboard() {
       }
     }
 
-    async function handleTranscript(transcript: string) {
-      if (cancelled || handlingTranscript) return
+    async function startBackendSttListening() {
+      if (isSessionStopped() || handlingTranscript || mediaRecorderRef.current) return
+
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        startBrowserSpeechRecognition()
+        return
+      }
+
+      shouldListen = true
+      setCoreSessionState("listening")
+
+      let stream: MediaStream | null = null
+      let audioContext: AudioContext | null = null
+      let animationFrame = 0
+      let stopTimer = 0
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        })
+
+        if (isSessionStopped() || !shouldListen) {
+          stream.getTracks().forEach((track) => track.stop())
+          return
+        }
+
+        const mimeType = resolveRecorderMimeType()
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+        const chunks: BlobPart[] = []
+        const startedAt = Date.now()
+        let speechStarted = false
+        let lastVoiceAt = Date.now()
+
+        mediaRecorderRef.current = recorder
+        voiceStreamRef.current = stream
+
+        audioContext = new AudioContext()
+        voiceAudioContextRef.current = audioContext
+        const source = audioContext.createMediaStreamSource(stream)
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 1024
+        analyser.smoothingTimeConstant = 0.65
+        source.connect(analyser)
+
+        const samples = new Uint8Array(analyser.fftSize)
+        const stopRecorder = () => {
+          if (recorder.state !== "inactive") {
+            try {
+              recorder.stop()
+            } catch {
+              // The recorder may have stopped between frames.
+            }
+          }
+        }
+
+        const monitorAudio = () => {
+          if (isSessionStopped() || recorder.state === "inactive") return
+
+          analyser.getByteTimeDomainData(samples)
+          let peak = 0
+          for (let index = 0; index < samples.length; index += 1) {
+            peak = Math.max(peak, Math.abs(samples[index] - 128) / 128)
+          }
+
+          const now = Date.now()
+          if (peak > 0.08) {
+            speechStarted = true
+            lastVoiceAt = now
+          }
+
+          if ((speechStarted && now - lastVoiceAt > 950) || now - startedAt > 8500) {
+            stopRecorder()
+            return
+          }
+
+          animationFrame = window.requestAnimationFrame(monitorAudio)
+        }
+
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) chunks.push(event.data)
+        }
+
+        recorder.onstop = () => {
+          window.cancelAnimationFrame(animationFrame)
+          window.clearTimeout(stopTimer)
+          mediaRecorderRef.current = null
+          stream?.getTracks().forEach((track) => track.stop())
+          voiceStreamRef.current = null
+          if (voiceAudioContextRef.current === audioContext) {
+            voiceAudioContextRef.current = null
+          }
+          void audioContext?.close().catch(() => null)
+
+          if (isSessionStopped() || !shouldListen || handlingTranscript) return
+
+          const audioBlob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" })
+          if (!speechStarted || audioBlob.size < 1200) {
+            window.setTimeout(() => {
+              if (!isSessionStopped() && shouldListen && !handlingTranscript) startListening()
+            }, 250)
+            return
+          }
+
+          shouldListen = false
+          setCoreSessionState("thinking")
+          setCoreReport("Processing voice...")
+
+          void uploadCoreAudioForTranscript(audioBlob)
+            .then((transcript) => {
+              if (!transcript) {
+                throw new Error("Empty STT transcript.")
+              }
+              return handleTranscript(transcript, "voice")
+            })
+            .catch((error) => {
+              if (isSessionStopped() || error instanceof DOMException && error.name === "AbortError") return
+              setCoreSessionState("listening")
+              setCoreReport("Backend STT was unavailable. Falling back to browser speech recognition.")
+              window.setTimeout(() => {
+                if (!isSessionStopped() && !handlingTranscript) startBrowserSpeechRecognition()
+              }, 450)
+            })
+        }
+
+        recorder.onerror = () => {
+          stopCoreVoiceCapture()
+          if (!isSessionStopped() && shouldListen) startBrowserSpeechRecognition()
+        }
+
+        recorder.start(250)
+        animationFrame = window.requestAnimationFrame(monitorAudio)
+        stopTimer = window.setTimeout(stopRecorder, 9000)
+      } catch {
+        window.cancelAnimationFrame(animationFrame)
+        window.clearTimeout(stopTimer)
+        stream?.getTracks().forEach((track) => track.stop())
+        void audioContext?.close().catch(() => null)
+        voiceStreamRef.current = null
+        voiceAudioContextRef.current = null
+        mediaRecorderRef.current = null
+        if (!isSessionStopped()) startBrowserSpeechRecognition()
+      }
+    }
+
+    function startListening() {
+      if (isSessionStopped() || handlingTranscript) return
+      void startBackendSttListening()
+    }
+
+    async function handleTranscript(transcript: string, channel: "text" | "voice" = "voice") {
+      if (isSessionStopped() || handlingTranscript) return
 
       handlingTranscript = true
       shouldListen = false
-      speechRecognitionRef.current?.stop()
+      stopCoreVoiceCapture()
       setCoreSessionState("thinking")
       setCoreReport(transcript)
+
+      if (channel === "voice" && isSuspiciousVoiceTranscript(transcript)) {
+        handlingTranscript = false
+        setCoreSessionState("listening")
+        setCoreReport(`Core heard "${transcript}". Please repeat that command more clearly.`)
+        window.setTimeout(() => {
+          if (!isSessionStopped()) startListening()
+        }, 650)
+        return
+      }
 
       const chatController = new AbortController()
       chatAbortRef.current = chatController
@@ -641,7 +1059,7 @@ export function StarkNeuralDashboard() {
         const response = await fetch("/api/backend/agent/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: transcript, channel: "voice" }),
+          body: JSON.stringify({ message: transcript, channel }),
           cache: "no-store",
           signal: chatController.signal,
         })
@@ -649,19 +1067,19 @@ export function StarkNeuralDashboard() {
         const payload = await response.json()
         const assistantReply = extractAssistantReply(payload)
 
-        if (!assistantReply || cancelled) return
+        if (!assistantReply || isSessionStopped()) return
 
         setCoreSessionState("speaking")
         setCoreReport(assistantReply)
         await speakCoreResponse(assistantReply)
       } catch (error) {
-        if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+        if (!isSessionStopped() && !(error instanceof DOMException && error.name === "AbortError")) {
           setCoreSessionState("error")
           setCoreReport("Core AI could not process the voice turn. Check backend chat and TTS connectivity.")
         }
       } finally {
         handlingTranscript = false
-        if (!cancelled) {
+        if (!isSessionStopped()) {
           startListening()
         }
       }
@@ -670,7 +1088,7 @@ export function StarkNeuralDashboard() {
     coreTextSubmitRef.current = (message: string) => {
       const normalizedMessage = message.trim()
       if (!normalizedMessage) return
-      void handleTranscript(normalizedMessage)
+      void handleTranscript(normalizedMessage, "text")
     }
 
     async function startCoreGreeting() {
@@ -686,18 +1104,18 @@ export function StarkNeuralDashboard() {
         const payload = (await response.json()) as { message?: string }
         const report = String(payload.message ?? "").trim()
 
-        if (!report || cancelled) return
+        if (!report || isSessionStopped()) return
 
         setCoreReport(report)
         setCoreSessionState("speaking")
 
         await speakCoreResponse(report)
 
-        if (!cancelled) {
+        if (!isSessionStopped()) {
           startListening()
         }
       } catch (error) {
-        if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+        if (!isSessionStopped() && !(error instanceof DOMException && error.name === "AbortError")) {
           setCoreSessionState("error")
           setCoreReport("Core AI session could not start. Check the backend connection and TTS configuration.")
         }
@@ -712,9 +1130,10 @@ export function StarkNeuralDashboard() {
       greetingController.abort()
       ttsAbortRef.current?.abort()
       chatAbortRef.current?.abort()
-      speechRecognitionRef.current?.abort()
-      speechRecognitionRef.current = null
+      stopCoreVoiceCapture()
       coreTextSubmitRef.current = null
+      threeCoreRef.current?.setAudioElement(null)
+      threeCoreRef.current?.setSyntheticSpeech(false)
       coreAudioRef.current?.pause()
       coreAudioRef.current = null
       window.speechSynthesis?.cancel()
@@ -730,6 +1149,28 @@ export function StarkNeuralDashboard() {
     coreColorRef.current = coreColor
     threeCoreRef.current?.setColor(coreColor)
   }, [coreColor])
+
+  useEffect(() => {
+    if (!rainbowCoreEnabled || !overlayActive) return
+
+    let animationFrame = 0
+    let lastUpdate = 0
+    const startedAt = performance.now()
+
+    const animateRainbow = (timestamp: number) => {
+      if (timestamp - lastUpdate > 70) {
+        lastUpdate = timestamp
+        const hue = ((timestamp - startedAt) * 0.045) % 360
+        setCoreColor((current) => hueToCoreColor(hue, current.a))
+      }
+
+      animationFrame = window.requestAnimationFrame(animateRainbow)
+    }
+
+    animationFrame = window.requestAnimationFrame(animateRainbow)
+
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [overlayActive, rainbowCoreEnabled])
 
   useEffect(() => {
     const dashboard = document.querySelector<HTMLElement>(".stark-dashboard")
@@ -795,7 +1236,7 @@ export function StarkNeuralDashboard() {
         <div className="stark-ai-core-stage">
           {overlayActive ? <canvas ref={canvasRef} id="neural-canvas" className="stark-neural-canvas" aria-hidden="true" /> : null}
           <div className="stark-ai-equation" aria-hidden="true">
-            x<sup>2</sup> + y<sup>2</sup> + z<sup>2</sup> = R<sup>2</sup>
+            F.R.I.D.A.Y
           </div>
           <div className="stark-ai-physics-readout" aria-hidden="true">
             <span>E = mc<sup>2</sup></span>
@@ -847,7 +1288,7 @@ export function StarkNeuralDashboard() {
               </button>
             </form>
           </div>
-          <button className="stark-overlay-close" type="button" onClick={() => setOverlayActive(false)}>
+          <button className="stark-overlay-close" type="button" onClick={disconnectCoreSession}>
             {t.disconnect}
           </button>
           <div className="stark-core-color-picker" aria-label={t.coreColor as string}>
@@ -855,13 +1296,25 @@ export function StarkNeuralDashboard() {
               <span>{t.coreColor}</span>
               <output>{coreColorCss}</output>
             </div>
+            <label className="stark-core-rainbow">
+              <input
+                type="checkbox"
+                checked={rainbowCoreEnabled}
+                onChange={(event) => setRainbowCoreEnabled(event.target.checked)}
+              />
+              <span>RAINBOW</span>
+              <i aria-hidden="true" />
+            </label>
             <div className="stark-core-color-picker__row">
               <label className="stark-core-swatch">
                 <span>HEX</span>
                 <input
                   type="color"
                   value={coreColorHex}
-                  onChange={(event) => setCoreColor(hexToCoreColor(event.target.value, coreColor.a))}
+                  onChange={(event) => {
+                    setRainbowCoreEnabled(false)
+                    setCoreColor(hexToCoreColor(event.target.value, coreColor.a))
+                  }}
                   aria-label="Core color swatch"
                 />
               </label>
@@ -873,12 +1326,13 @@ export function StarkNeuralDashboard() {
                     min={0}
                     max={255}
                     value={coreColor[channel]}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      setRainbowCoreEnabled(false)
                       setCoreColor((current) => ({
                         ...current,
                         [channel]: clampColorInput(Number(event.target.value)),
                       }))
-                    }
+                    }}
                   />
                 </label>
               ))}

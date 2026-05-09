@@ -1493,8 +1493,12 @@
 .stark-ai-equation {
   top: clamp(52px, 8vh, 96px);
   width: min(680px, calc(100vw - 64px));
+  font-family: var(--font-geist-mono);
   font-size: clamp(1.9rem, 4.5vw, 4.2rem);
+  font-weight: 800;
+  letter-spacing: 0;
   line-height: 1;
+  text-transform: uppercase;
 }
 
 .stark-ai-equation sup,
@@ -1660,6 +1664,7 @@
 
 .stark-core-color-picker__head,
 .stark-core-color-picker__row,
+.stark-core-rainbow,
 .stark-core-alpha {
   display: flex;
   align-items: center;
@@ -1674,6 +1679,7 @@
 .stark-core-color-picker__head span,
 .stark-core-swatch span,
 .stark-core-channel span,
+.stark-core-rainbow span,
 .stark-core-alpha span,
 .stark-core-alpha b {
   font-size: 0.68rem;
@@ -1693,8 +1699,37 @@
 
 .stark-core-swatch,
 .stark-core-channel,
+.stark-core-rainbow,
 .stark-core-alpha {
   min-width: 0;
+}
+
+.stark-core-rainbow {
+  justify-content: space-between;
+  border: 1px solid rgba(var(--stark-core-rgb), 0.28);
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+
+.stark-core-rainbow input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--stark-core-color);
+}
+
+.stark-core-rainbow span {
+  flex: 1 1 auto;
+  color: color-mix(in srgb, var(--stark-core-color), white 42%);
+}
+
+.stark-core-rainbow i {
+  width: 82px;
+  height: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(90deg, #ff3b30, #ffcc00, #34c759, #00c7ff, #5856d6, #ff2d55);
+  box-shadow: 0 0 14px rgba(var(--stark-core-rgb), 0.22);
 }
 
 .stark-core-swatch,
