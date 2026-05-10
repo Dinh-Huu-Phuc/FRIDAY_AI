@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { DashboardBackground } from "@/components/dashboard/dashboard-background"
+import {
+  CoreAICodePanel,
+  extractCodePanel,
+  stripCodeForSpeech,
+  type CoreCodePanel,
+} from "@/components/dashboard/core-ai"
 import { createDashboardThreeCore, type DashboardCoreColor } from "@/components/dashboard/js/dashboard-three-core"
 
 type Locale = "en" | "vi"
@@ -503,6 +509,7 @@ export function StarkNeuralDashboard() {
   const [rainbowCoreEnabled, setRainbowCoreEnabled] = useState(false)
   const [coreSessionState, setCoreSessionState] = useState<CoreSessionState>("idle")
   const [coreReport, setCoreReport] = useState("")
+  const [coreCodePanel, setCoreCodePanel] = useState<CoreCodePanel | null>(null)
   const [coreTextInput, setCoreTextInput] = useState("")
   const terminalRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -526,6 +533,9 @@ export function StarkNeuralDashboard() {
     () => `rgba(${coreColor.r}, ${coreColor.g}, ${coreColor.b}, ${coreColor.a})`,
     [coreColor]
   )
+  const closeCoreCodePanel = useCallback(() => {
+    setCoreCodePanel(null)
+  }, [])
 
   const disconnectCoreSession = useCallback(() => {
     coreSessionVersionRef.current += 1
@@ -576,6 +586,7 @@ export function StarkNeuralDashboard() {
     coreTextSubmitRef.current = null
     setCoreSessionState("idle")
     setCoreReport("")
+    setCoreCodePanel(null)
     setOverlayActive(false)
   }, [])
 
@@ -1069,9 +1080,13 @@ export function StarkNeuralDashboard() {
 
         if (!assistantReply || isSessionStopped()) return
 
+        const codePanel = extractCodePanel(assistantReply)
+        const spokenReply = codePanel ? stripCodeForSpeech(assistantReply) : assistantReply
+
+        setCoreCodePanel(codePanel)
         setCoreSessionState("speaking")
-        setCoreReport(assistantReply)
-        await speakCoreResponse(assistantReply)
+        setCoreReport(spokenReply)
+        await speakCoreResponse(spokenReply)
       } catch (error) {
         if (!isSessionStopped() && !(error instanceof DOMException && error.name === "AbortError")) {
           setCoreSessionState("error")
@@ -1243,6 +1258,9 @@ export function StarkNeuralDashboard() {
             <span>Psi = exp(-i k r) / r</span>
             <span>Systemic Cohesion: Optimal</span>
           </div>
+          {coreCodePanel ? (
+            <CoreAICodePanel panel={coreCodePanel} onClose={closeCoreCodePanel} />
+          ) : null}
           <div className="stark-ai-overlay-label">
             <span>{t.overlayStatus}</span>
             <b>
