@@ -42,3 +42,23 @@ def update_last_login(db: Session, user: User, when: datetime) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def update_user_quotas(
+    db: Session,
+    user: User,
+    *,
+    free_question_limit_daily: int | None = None,
+    api_key_question_limit_daily: int | None = None,
+    is_active: bool | None = None,
+) -> User:
+    if free_question_limit_daily is not None:
+        user.free_question_limit_daily = free_question_limit_daily
+    if api_key_question_limit_daily is not None:
+        user.api_key_question_limit_daily = api_key_question_limit_daily
+    if is_active is not None:
+        user.is_active = is_active
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

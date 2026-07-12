@@ -115,9 +115,9 @@
   async function copyText(text) {
     try {
       await navigator.clipboard.writeText(text);
-      showToast("Đã copy");
+      showToast("Copied");
     } catch {
-      showToast("Copy lỗi");
+      showToast("Copy failed");
     }
   }
 
@@ -326,7 +326,7 @@
     button.textContent = "✨ Format Code";
     button.addEventListener("click", () => {
       runEnhancer();
-      showToast("Đã format lại code");
+      showToast("Code reformatted");
     });
     document.body.appendChild(button);
   }

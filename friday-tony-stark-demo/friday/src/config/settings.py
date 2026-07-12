@@ -19,11 +19,25 @@ class Settings:
     environment: str = os.getenv("FRIDAY_ENV", "local")
     host: str = os.getenv("FRIDAY_API_HOST", "127.0.0.1")
     port: int = int(os.getenv("FRIDAY_API_PORT", "8001"))
+    local_only: bool = os.getenv("FRIDAY_LOCAL_ONLY", "true").lower() in {"1", "true", "yes", "on"}
+    expose_api_docs: bool = os.getenv("FRIDAY_EXPOSE_API_DOCS", "false").lower() in {"1", "true", "yes", "on"}
+    auto_open_browser: bool = os.getenv("FRIDAY_AUTO_OPEN_BROWSER", "true").lower() in {"1", "true", "yes", "on"}
+    browser_path: str = os.getenv("FRIDAY_BROWSER_PATH", "")
+    start_mode: str = os.getenv("FRIDAY_START_MODE", "fast")
+    background_warmup: bool = os.getenv("FRIDAY_BACKGROUND_WARMUP", "true").lower() in {"1", "true", "yes", "on"}
+    initial_state: str = os.getenv("FRIDAY_INITIAL_STATE", "active")
+    wake_phrase: str = os.getenv("FRIDAY_WAKE_PHRASE", "friday wake up")
+    sleep_phrase: str = os.getenv("FRIDAY_SLEEP_PHRASE", "friday sleep")
+    local_wake_word: bool = os.getenv("FRIDAY_LOCAL_WAKE_WORD", "true").lower() in {"1", "true", "yes", "on"}
+    ollama_preload: bool = os.getenv("FRIDAY_OLLAMA_PRELOAD", "true").lower() in {"1", "true", "yes", "on"}
+    window_sleep_enabled: bool = os.getenv("FRIDAY_WINDOW_SLEEP_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+    window_snapshot_path: str = os.getenv("FRIDAY_WINDOW_SNAPSHOT_PATH", "")
+    window_restore_on_startup: bool = os.getenv("FRIDAY_WINDOW_RESTORE_ON_STARTUP", "true").lower() in {"1", "true", "yes", "on"}
     cors_origins: list[str] = [
         origin.strip()
         for origin in os.getenv(
             "FRIDAY_CORS_ORIGINS",
-            "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+            "http://localhost:8001,http://127.0.0.1:8001",
         ).split(",")
         if origin.strip()
     ]

@@ -15,7 +15,7 @@ def build_world_agent_news_context(
     digest = build_articles_digest(articles)
 
     if status != "ok":
-        safe_fallback = fallback_message or "Hiện chưa lấy được luồng tin thế giới phù hợp."
+        safe_fallback = fallback_message or "No relevant world news feed is available right now."
         return (
             "[NEWS_CONTEXT]\n"
             f"status={status}\n"
@@ -24,7 +24,7 @@ def build_world_agent_news_context(
             f"search_query={query.text_query or ''}\n"
             "article_count=0\n"
             f"fallback_user_message={safe_fallback}\n"
-            "response_rules=Trả lời ngắn gọn bằng tiếng Việt, nêu rõ đây là tin thế giới, không nói kỹ thuật nội bộ."
+            "response_rules=Reply briefly in English, identify this as world news, and hide implementation details."
         )
 
     return (
@@ -34,7 +34,7 @@ def build_world_agent_news_context(
         f"topic={topic}\n"
         f"search_query={query.text_query or ''}\n"
         f"article_count={len(articles)}\n"
-        "response_rules=Tóm tắt 3 đến 5 câu ngắn bằng tiếng Việt tự nhiên, nêu rõ đây là tin thế giới, diễn đạt lại nội dung tiếng Anh nếu cần, không trả raw JSON.\n"
+        "response_rules=Summarize in three to five concise English sentences, identify this as world news, and never return raw JSON.\n"
         "articles_digest=\n"
         f"{digest}"
     )
@@ -42,9 +42,9 @@ def build_world_agent_news_context(
 
 def build_world_news_fallback_message(*, reason: str) -> str:
     if reason == "missing_world_api_key":
-        return "Luồng tin thế giới chưa được cấu hình đầy đủ, sếp. Muốn tôi thử lại sau khi cập nhật WORLD_NEWS không?"
+        return "The world news feed is not fully configured, boss. Should I retry after WORLD_NEWS is updated?"
     if reason in {"network_error", "timeout", "io_error"}:
-        return "Kết nối tới nguồn tin thế giới đang chập chờn, sếp. Tôi sẽ thử lại ngay khi đường truyền ổn định hơn."
+        return "The world news connection is unstable, boss. I will retry when it improves."
     if reason == "no_data":
-        return "Hiện chưa có bài tin thế giới phù hợp với yêu cầu này, sếp."
-    return "Hiện tôi chưa lấy được luồng tin thế giới phù hợp, sếp."
+        return "No world news articles currently match this request, boss."
+    return "I could not retrieve a relevant world news feed, boss."

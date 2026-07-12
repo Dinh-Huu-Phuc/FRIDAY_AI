@@ -15,6 +15,7 @@ Run:
 from collections import deque
 
 from friday.config import config
+from friday.app.power import PowerIntent, detect_power_intent, get_power_state
 from friday.log import DailyInteractionLogger
 from friday.refiner import STTCorrector
 from friday.trainModel import ConversationDatasetStore
@@ -22,6 +23,9 @@ from friday.trainModel.memory import MemoryManager
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import AgentSession
 from server.agent_runtime.bootstrap import bootstrap_environment, logger
+
+bootstrap_environment()
+
 from server.agent_runtime.friday_agent import FridayAgent
 from server.agent_runtime.providers import (
     GEMINI_LLM_MODEL,
@@ -38,9 +42,6 @@ from server.agent_runtime.providers import (
     turn_detection,
 )
 from server.agent_runtime.training import build_news_service, build_train_model_config, get_or_start_scheduler
-
-bootstrap_environment()
-
 
 # ---------------------------------------------------------------------------
 # LiveKit entry point
@@ -142,6 +143,8 @@ async def entrypoint(ctx: JobContext) -> None:
         if not getattr(event, "is_final", False):
             return
         transcript = str(getattr(event, "transcript", "") or "").strip()
+        if get_power_state().sleeping and detect_power_intent(transcript) != PowerIntent.WAKE:
+            return
         _enqueue_user_turn(
             getattr(event, "speaker_id", None),
             raw_text=transcript,
@@ -162,6 +165,8 @@ async def entrypoint(ctx: JobContext) -> None:
             return
 
         if role == "user":
+            if get_power_state().sleeping and detect_power_intent(text) != PowerIntent.WAKE:
+                return
             if not pending_user_turns:
                 extracted = _extract_user_text_from_content(text)
                 _enqueue_user_turn(

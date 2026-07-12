@@ -273,48 +273,77 @@ def check_unread_gmail(*, include_locally_reported: bool = False) -> GmailCheckR
     except Exception as exc:
         return GmailCheckResult(
             ok=False,
-            message="Tôi chưa thể đọc Gmail lúc này.",
+            message="I cannot read Gmail right now.",
             error=f"{type(exc).__name__}: {exc}",
         )
 
 
 def format_gmail_report(result: GmailCheckResult) -> str:
-    opening = "Vâng thưa sếp. Sếp chờ em chút, em đang check Gmail và sẽ báo cáo ngay."
+    opening = "Certainly, boss. I am checking Gmail now and will report back shortly."
 
     if not result.ok:
-        return f"{opening}\n\n{result.message} Chi tiết kỹ thuật: {result.error}"
+        return f"{opening}\n\n{result.message} Technical detail: {result.error}"
 
     if result.unread_count == 0:
-        return f"{opening}\n\nSếp hiện không có email chưa đọc nào trong Gmail."
+        return f"{opening}\n\nYou have no unread Gmail messages."
 
     if result.reported_count == 0:
         return (
-            f"{opening}\n\nSếp có {result.unread_count} email chưa đọc, "
-            "nhưng các email đó FRIDAY đã báo cáo trước đó rồi."
+            f"{opening}\n\nYou have {result.unread_count} unread messages, "
+            "but FRIDAY has already reported all of them."
         )
 
     lines = [
         opening,
         "",
-        f"Sếp có {result.unread_count} email chưa đọc. Em báo cáo {result.reported_count} email mới chưa từng đọc cho sếp:",
+        f"You have {result.unread_count} unread messages. Here are {result.reported_count} newly reported messages:",
     ]
 
     for index, message in enumerate(result.messages, start=1):
-        preview = message.body_preview or message.snippet or "(không có nội dung xem trước)"
+        preview = message.body_preview or message.snippet or "(no preview available)"
         preview = preview[:420].strip()
         lines.extend(
             [
                 "",
-                f"{index}. Từ: {message.sender}",
-                f"   Chủ đề: {message.subject}",
-                f"   Nội dung chính: {preview}",
+                f"{index}. From: {message.sender}",
+                f"   Subject: {message.subject}",
+                f"   Preview: {preview}",
             ]
         )
 
     if result.log_path:
-        lines.extend(["", f"Em đã lưu log Gmail đã đọc tại: {result.log_path}"])
+        lines.extend(["", f"The Gmail report log was saved to: {result.log_path}"])
 
     return "\n".join(lines)
+
+
+def format_gmail_voice_report(result: GmailCheckResult) -> str:
+    opening = "Gmail check complete, boss."
+
+    if not result.ok:
+        return f"{opening} I cannot read Gmail right now. {result.message or ''}".strip()
+
+    if result.unread_count == 0:
+        return f"{opening} There are no unread Gmail messages."
+
+    if result.reported_count == 0:
+        return (
+            f"{opening} You have {result.unread_count} unread messages, "
+            "but FRIDAY has already reported all of them."
+        )
+
+    summary_lines = [
+        f"{opening} You have {result.unread_count} unread messages. Here is a summary of {result.reported_count} new messages:",
+    ]
+    for index, message in enumerate(result.messages[:5], start=1):
+        sender = re.sub(r"<[^>]+>", "", message.sender).strip() or "unknown sender"
+        subject = (message.subject or "no subject").strip()
+        summary_lines.append(f"{index}. From {sender}, subject: {subject}.")
+
+    if result.reported_count > 5:
+        summary_lines.append(f"I left {result.reported_count - 5} additional messages in the log for later review.")
+
+    return " ".join(summary_lines)[:1800].strip()
 async def check_unread_gmail_with_timeout(
     *,
     include_locally_reported: bool = False,
@@ -334,45 +363,45 @@ async def check_unread_gmail_with_timeout(
     except asyncio.TimeoutError:
         return GmailCheckResult(
             ok=False,
-            message="Gmail API phản hồi quá lâu nên em đã dừng phiên check để tránh làm kẹt Core AI.",
+            message="The Gmail API timed out, so I stopped the check to keep the AI core responsive.",
             error=f"Timeout after {timeout_seconds:.1f}s",
         )
 
 
 def format_gmail_report(result: GmailCheckResult) -> str:
-    opening = "Vâng thưa sếp. Sếp chờ em chút, em đang check Gmail và sẽ báo cáo ngay."
+    opening = "Certainly, boss. I am checking Gmail now and will report back shortly."
 
     if not result.ok:
-        return f"{opening}\n\n{result.message} Chi tiết kỹ thuật: {result.error}"
+        return f"{opening}\n\n{result.message} Technical detail: {result.error}"
 
     if result.unread_count == 0:
-        return f"{opening}\n\nSếp hiện không có email chưa đọc nào trong Gmail."
+        return f"{opening}\n\nYou have no unread Gmail messages."
 
     if result.reported_count == 0:
         return (
-            f"{opening}\n\nSếp có {result.unread_count} email chưa đọc, "
-            "nhưng các email đó FRIDAY đã báo cáo trước đó rồi."
+            f"{opening}\n\nYou have {result.unread_count} unread messages, "
+            "but FRIDAY has already reported all of them."
         )
 
     lines = [
         opening,
         "",
-        f"Sếp có {result.unread_count} email chưa đọc. Em báo cáo {result.reported_count} email mới chưa từng đọc cho sếp:",
+        f"You have {result.unread_count} unread messages. Here are {result.reported_count} newly reported messages:",
     ]
 
     for index, message in enumerate(result.messages, start=1):
-        preview = message.body_preview or message.snippet or "(không có nội dung xem trước)"
+        preview = message.body_preview or message.snippet or "(no preview available)"
         preview = preview[:420].strip()
         lines.extend(
             [
                 "",
-                f"{index}. Từ: {message.sender}",
-                f"   Chủ đề: {message.subject}",
-                f"   Nội dung chính: {preview}",
+                f"{index}. From: {message.sender}",
+                f"   Subject: {message.subject}",
+                f"   Preview: {preview}",
             ]
         )
 
     if result.log_path:
-        lines.extend(["", f"Em đã lưu log Gmail đã đọc tại: {result.log_path}"])
+        lines.extend(["", f"The Gmail report log was saved to: {result.log_path}"])
 
     return "\n".join(lines)

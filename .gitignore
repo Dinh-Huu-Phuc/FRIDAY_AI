@@ -3,3 +3,8 @@
 everything/
 .vscode/
 
+admin/.env
+admin/
+command.txt/
+.codex/skills/
+assets/

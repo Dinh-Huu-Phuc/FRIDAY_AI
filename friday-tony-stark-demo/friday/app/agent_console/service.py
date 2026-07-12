@@ -24,15 +24,60 @@ class AgentConsoleService:
         self._lock = threading.Lock()
         self._module_dir = Path(__file__).resolve().parent
         self._log_dir = friday_save_log_dir("agent_console")
+        self._savechat_dir = friday_save_log_dir("savechat")
         self._log_dir.mkdir(parents=True, exist_ok=True)
+        self._savechat_dir.mkdir(parents=True, exist_ok=True)
         self._state_path = self._log_dir / "console_state.json"
         self._turn_log_path = self._log_dir / "conversation_turns.jsonl"
+        self._memory_states: dict[str, ConsoleState] = {}
         self._logger = DailyInteractionLogger(save_dir=self._log_dir)
         self._dataset_store = ConversationDatasetStore(TrainModelConfig())
 
     def get_snapshot(self, session_id: str = "browser-console") -> dict[str, Any]:
         with self._lock:
             state = self._load_state(session_id=session_id)
+            return self._build_snapshot_payload(state)
+
+    def archive_and_reset_chat(
+        self,
+        *,
+        session_id: str = "browser-console",
+        reason: str = "manual_clear",
+    ) -> dict[str, Any]:
+        with self._lock:
+            state = self._load_state(session_id=session_id)
+            archive_path = self._archive_state_if_needed(state, reason=reason)
+            fresh_state = self._fresh_state(session_id=session_id)
+            self._save_state(fresh_state)
+            payload = self._build_snapshot_payload(fresh_state)
+            payload["archivePath"] = str(archive_path) if archive_path else ""
+            return payload
+
+    def add_assistant_message(
+        self,
+        *,
+        session_id: str,
+        content: str,
+        channel: str = "text",
+    ) -> dict[str, Any]:
+        normalized_content = content.strip()
+        if not normalized_content:
+            return self.get_snapshot(session_id=session_id)
+
+        with self._lock:
+            state = self._load_state(session_id=session_id)
+            state.messages.append(
+                ConsoleMessage(
+                    id=f"assistant-{uuid.uuid4().hex[:10]}",
+                    role="assistant",
+                    content=normalized_content,
+                    channel="voice" if channel == "voice" else "text",
+                    status="received",
+                )
+            )
+            state.updated_at = _now_iso()
+            state.messages = state.messages[-80:]
+            self._save_state(state)
             return self._build_snapshot_payload(state)
 
     def send_message(self, request: ConsoleChatRequest) -> dict[str, Any]:
@@ -148,15 +193,24 @@ class AgentConsoleService:
             )
 
     def _load_state(self, *, session_id: str) -> ConsoleState:
+        if session_id in self._memory_states:
+            return self._memory_states[session_id]
+
         if self._state_path.exists():
             try:
                 payload = json.loads(self._state_path.read_text(encoding="utf-8"))
                 state = ConsoleState.model_validate(payload)
                 if state.session_id == session_id:
+                    self._memory_states[session_id] = state
                     return state
             except json.JSONDecodeError:
                 pass
 
+        state = self._fresh_state(session_id=session_id)
+        self._memory_states[session_id] = state
+        return state
+
+    def _fresh_state(self, *, session_id: str) -> ConsoleState:
         return ConsoleState(
             session_id=session_id,
             messages=[
@@ -174,16 +228,46 @@ class AgentConsoleService:
             ],
         )
 
-    def _save_state(self, state: ConsoleState) -> None:
-        self._state_path.write_text(
-            state.model_dump_json(indent=2),
+    def _archive_state_if_needed(self, state: ConsoleState, *, reason: str) -> Path | None:
+        chat_messages = [message for message in state.messages if message.id != "console-bootstrap"]
+        if not chat_messages:
+            return None
+
+        archived_at = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        filename = f"{archived_at}_{state.session_id}_{reason}.json"
+        safe_filename = "".join(
+            character if character.isalnum() or character in {"-", "_", "."} else "_"
+            for character in filename
+        )
+        archive_path = self._savechat_dir / safe_filename
+        archive_payload = {
+            "archived_at": _now_iso(),
+            "reason": reason,
+            "session_id": state.session_id,
+            "message_count": len(state.messages),
+            "state": state.model_dump(mode="json"),
+        }
+        archive_path.write_text(
+            json.dumps(archive_payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        return archive_path
+
+    def _save_state(self, state: ConsoleState) -> None:
+        self._memory_states[state.session_id] = state
+        try:
+            self._state_path.write_text(
+                state.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+        except OSError:
+            # Keep the UI alive even when Windows keeps the old state file locked.
+            return
 
     def _build_reply(self, user_message: str) -> dict[str, Any]:
         lowered = user_message.lower()
 
-        if any(token in lowered for token in ("run cycle", "chu ky", "mot chu ky", "cycle")):
+        if any(token in lowered for token in ("run cycle", "cycle")):
             run_response = run_computer_cycle(RunRequest(goal=user_message))
             runtime_state = self._runtime_payload(run_response.runtime_context.model_dump())
             latest_plan = self._plan_payload_from_run(run_response.model_dump(by_alias=True, mode="json"))
@@ -192,8 +276,8 @@ class AgentConsoleService:
             )
             return {
                 "assistant_message": (
-                    f"Da chay xong mot chu ky an toan. "
-                    f"Hanh dong hien tai la {run_response.action.action_type}. "
+                    f"The safe cycle completed. "
+                    f"The current action is {run_response.action.action_type}. "
                     f"{run_response.execution.message}"
                 ),
                 "runtime_state": runtime_state,
@@ -201,14 +285,14 @@ class AgentConsoleService:
                 "latest_execution": latest_execution,
             }
 
-        if any(token in lowered for token in ("plan", "ke hoach", "next step", "buoc tiep")):
+        if any(token in lowered for token in ("plan", "next step")):
             plan_response = plan_computer(PlanRequest(goal=user_message))
             runtime_state = self._runtime_payload(plan_response.runtime_context.model_dump())
             latest_plan = self._plan_payload(plan_response.model_dump(by_alias=True, mode="json"))
             return {
                 "assistant_message": (
-                    f"Toi da lap xong buoc tiep theo. "
-                    f"Hanh dong de xuat la {plan_response.action.action_type}: "
+                    f"I prepared the next step. "
+                    f"The proposed action is {plan_response.action.action_type}: "
                     f"{plan_response.action.description}"
                 ),
                 "runtime_state": runtime_state,
@@ -219,12 +303,12 @@ class AgentConsoleService:
         if any(token in lowered for token in ("observe", "quan sat", "screen", "man hinh", "inspect")):
             observe_response = observe_computer(ObserveRequest(goal=user_message, compress_image=True))
             observation = observe_response.observation
-            notes = ", ".join(observation.notes[:2]) if observation.notes else "khong co canh bao nao"
+            notes = ", ".join(observation.notes[:2]) if observation.notes else "no warnings"
             return {
                 "assistant_message": (
-                    f"Toi vua quan sat xong man hinh. "
-                    f"Cua so hien tai la {observation.active_window_title or 'chua xac dinh'}, "
-                    f"va ghi nhan {notes}."
+                    f"I finished observing the screen. "
+                    f"The active window is {observation.active_window_title or 'unknown'}, "
+                    f"and I noted {notes}."
                 ),
                 "runtime_state": self._runtime_payload(
                     observe_response.runtime_context.model_dump()
@@ -234,15 +318,14 @@ class AgentConsoleService:
             }
 
         runtime_state = self._runtime_payload(get_computer_runtime_context())
-        active_window = runtime_state["activeWindowTitle"] or "chua co cua so hoat dong"
-        current_goal = runtime_state["currentGoal"] or "chua co muc tieu nao dang duoc dat"
+        active_window = runtime_state["activeWindowTitle"] or "no active window"
+        current_goal = runtime_state["currentGoal"] or "no active goal"
 
         return {
             "assistant_message": (
-                f"Da nhan lenh, sep. "
-                f"Hien toi dang theo doi {active_window} va muc tieu hien tai la {current_goal}. "
-                "Neu sep muon, toi co the quan sat man hinh, lap buoc tiep theo, "
-                "hoac chay mot chu ky ngay."
+                f"Command received, boss. "
+                f"I am monitoring {active_window}, and the current goal is {current_goal}. "
+                "I can observe the screen, plan the next step, or run a cycle now."
             ),
             "runtime_state": runtime_state,
             "latest_plan": None,
@@ -342,13 +425,16 @@ class AgentConsoleService:
             "latest_plan": latest_plan,
             "latest_execution": latest_execution,
         }
-        with self._turn_log_path.open("a", encoding="utf-8") as file_obj:
-            file_obj.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        try:
+            with self._turn_log_path.open("a", encoding="utf-8") as file_obj:
+                file_obj.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
-        self._logger.record_custom_event(
-            event_type="browser_console_turn",
-            payload=payload,
-        )
+            self._logger.record_custom_event(
+                event_type="browser_console_turn",
+                payload=payload,
+            )
+        except OSError:
+            return
 
     def _append_training_turn(
         self,
@@ -358,18 +444,21 @@ class AgentConsoleService:
         user_message: str,
         assistant_message: str,
     ) -> None:
-        self._dataset_store.append_raw_turn(
-            session_id=session_id,
-            user_id=None,
-            user_message=user_message,
-            assistant_message=assistant_message,
-            source="browser_console",
-            refined_input=user_message,
-            metadata={
-                "channel": channel,
-                "stored_from": "agent_console_api",
-            },
-        )
+        try:
+            self._dataset_store.append_raw_turn(
+                session_id=session_id,
+                user_id=None,
+                user_message=user_message,
+                assistant_message=assistant_message,
+                source="browser_console",
+                refined_input=user_message,
+                metadata={
+                    "channel": channel,
+                    "stored_from": "agent_console_api",
+                },
+            )
+        except OSError:
+            return
 
     def _build_snapshot_payload(
         self,

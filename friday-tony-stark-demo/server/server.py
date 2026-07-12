@@ -34,9 +34,9 @@ from friday.tools import register_all_tools
 mcp = FastMCP(
     name=config.SERVER_NAME,
     instructions=(
-        "Ban la Friday, mot tro ly AI phong cach Tony Stark. "
-        "Ban co quyen truy cap vao cac cong cu de ho tro nguoi dung. "
-        "Hay phan hoi ngan gon, chinh xac, huu ich va uu tien tieng Viet."
+        "You are FRIDAY, a Tony Stark-inspired AI assistant. "
+        "Use the available tools to help the user. "
+        "Respond in concise, accurate, useful English."
     ),
 )
 

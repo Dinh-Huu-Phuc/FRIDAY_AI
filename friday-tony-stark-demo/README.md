@@ -1,4 +1,4 @@
-DEV ĐINH HỮU PHÚC 
+Developer: Dinh Huu Phuc
 
 # BANNER FIRDAY
 
@@ -178,23 +178,30 @@ The MCP server will pick it up on next start.
 
 ---
 
-## FastAPI REST server for pageClient
+## FastAPI Python UI
 
-The web dashboard does **not** call the MCP server directly. It calls the FastAPI REST server on port `8001`.
+The browser dashboard is now served directly by the FastAPI app on port `8001`.
+There is no separate `pageClient`, `keyApis`, login flow, or platform API-key quota layer for local solo use.
 
 | Command | Entry point | What it does |
 |---------|------------|--------------|
-| `uv run friday-api` | `friday/src/main.py -> main()` | Launches the FastAPI REST API for web clients such as `pageClient`. |
+| `uv run friday-api` | `friday/src/main.py -> main()` | Launches the FastAPI backend and Python-served browser UI. |
 | `uv run friday_api` | `friday/src/main.py -> main()` | Alias for `friday-api`. |
 
-Run it in a separate terminal when using `pageClient`:
+Run it in a separate terminal:
 
 ```powershell
 cd G:\data\AI_FRIDAY\v3\FRIDAY\friday-tony-stark-demo
 uv run friday-api
 ```
 
-FastAPI docs:
+Open the local UI:
+
+```text
+http://127.0.0.1:8001/
+```
+
+FastAPI docs remain available at:
 
 ```text
 http://127.0.0.1:8001/docs
@@ -206,7 +213,7 @@ Recommended local process layout:
 |----------|---------|---------|
 | 1 | `uv run friday` | MCP tools for LiveKit / Agents Playground |
 | 2 | `uv run friday_voice` | LiveKit voice agent |
-| 3 | `uv run friday-api` | pageClient / REST API / docs |
+| 3 | `uv run friday-api` | Python UI / REST API / docs |
 
 ---
 
@@ -217,7 +224,7 @@ FRIDAY currently has two separate server surfaces:
 | Surface | Port | Consumer | Purpose |
 |---------|------|----------|---------|
 | MCP / SSE | `8000` | `https://agents-playground.livekit.io` through `friday_voice` | Voice agent tool calls, LiveKit agent tools, MCP resources/prompts. |
-| FastAPI REST | `8001` | `pageClient` and browser dashboard | Login, API keys, dashboard state, REST endpoints, web UI integration. |
+| FastAPI REST/UI | `8001` | Local browser dashboard | Agent chat, TTS/STT, dashboard state, realtime WebSocket UI. |
 
 Shared business logic should live under `friday/app/...`.
 
@@ -225,9 +232,9 @@ Adapters should stay thin:
 
 - MCP tools live in `friday/tools/...`
 - FastAPI routes live in `friday/src/router/v1/...`
-- pageClient calls FastAPI through `/api/backend/...`
+- The Python-served UI lives in `friday/src/web_ui/...` and calls FastAPI/WebSocket directly.
 
-This keeps LiveKit and pageClient using the same backend logic without mixing MCP-only code into the web API.
+This keeps LiveKit and the local browser UI using the same backend logic without a separate Next.js client.
 
 ---
 
@@ -330,11 +337,11 @@ https://agents-playground.livekit.io
 4. Say or type commands such as:
 
 ```text
-Mở Notepad
+Open Notepad
 ```
 
 ```text
-FRIDAY mở Chrome giúp tớ
+FRIDAY, open Chrome for me
 ```
 
 ```text
@@ -342,7 +349,7 @@ Open Visual Studio Code
 ```
 
 ```text
-Tìm ứng dụng calculator trên máy
+Find the Calculator application on this computer
 ```
 
 Expected behavior:

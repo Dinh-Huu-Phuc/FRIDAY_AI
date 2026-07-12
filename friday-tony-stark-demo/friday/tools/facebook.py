@@ -20,13 +20,13 @@ def _format_message_summary(limit: int, unread_only: bool) -> str:
     )
     if not response.items:
         return (
-            "Hien chua co tin nhan Facebook nao duoc dong bo. "
-            "Hay ket noi Messenger webhook cho Facebook Page truoc."
+            "No Facebook messages have been synchronized yet. "
+            "Connect the Messenger webhook for the Facebook Page first."
         )
 
-    lines = [f"Da tim thay {response.total} tin nhan Facebook gan nhat:"]
+    lines = [f"Found {response.total} recent Facebook messages:"]
     for index, item in enumerate(response.items, start=1):
-        text_preview = _trim_text(item.text or item.description or "(khong co noi dung)")
+        text_preview = _trim_text(item.text or item.description or "(no content)")
         lines.append(f"{index}. {item.sender_id or 'unknown'}: {text_preview}")
     return "\n".join(lines)
 
@@ -38,11 +38,11 @@ def _format_notification_summary(limit: int, event_types: list[str] | None = Non
     )
     if not response.items:
         return (
-            "Hien chua co thong bao Facebook nao duoc dong bo. "
-            "Hay ket noi webhook cho Facebook Page truoc."
+            "No Facebook notifications have been synchronized yet. "
+            "Connect the Facebook Page webhook first."
         )
 
-    lines = [f"Da tim thay {response.total} thong bao Facebook gan nhat:"]
+    lines = [f"Found {response.total} recent Facebook notifications:"]
     for index, item in enumerate(response.items, start=1):
         description = _trim_text(item.description or item.event_type)
         lines.append(f"{index}. {item.event_type}: {description}")

@@ -1,4 +1,11 @@
 [![GitHub release (latest by date)](https://shields.io)](https://github.com)
 
 
-![Uploading FIRDAY_AGENT.png…]()
+backend Server: [text](http://127.0.0.1:8000/sse)
+
+client: 1 -> LiveKit Agents 
+        2 -> Python UI: cd friday-tony-stark-demo && uv run friday-api
+
+Open the local UI at:
+
+http://127.0.0.1:8001/

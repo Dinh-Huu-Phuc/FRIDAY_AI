@@ -38,7 +38,7 @@ class SafetyFilter:
             ),
             SafetyRule(
                 name="hard_refusal",
-                pattern=re.compile(r"(?i)\b(i cannot help|toi khong the giup|cannot comply)\b"),
+                pattern=re.compile(r"(?i)\b(i cannot help|cannot comply)\b"),
                 reason="Assistant output is refusal-only and not useful for training.",
                 severity="medium",
             ),

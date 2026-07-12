@@ -16,7 +16,7 @@ logger = logging.getLogger("friday-world-news-service")
 
 
 class WorldNewsService:
-    """Dịch vụ tin tức thế giới dùng NewsAPI."""
+    """World news service backed by NewsAPI."""
 
     def __init__(
         self,

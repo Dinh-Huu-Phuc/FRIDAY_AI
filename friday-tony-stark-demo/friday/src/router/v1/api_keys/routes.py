@@ -8,12 +8,14 @@ from friday.src.dependencies.database import get_db
 from friday.src.models.user import User
 from friday.src.schemas.api_keys.requests import ApiKeyCreateRequest, ApiKeyVerifyRequest
 from friday.src.schemas.api_keys.responses import (
+    ApiKeyConsumeResponse,
     ApiKeyCreateResponse,
     ApiKeyMetadataResponse,
     ApiKeyRevokeResponse,
     ApiKeyVerifyResponse,
 )
 from friday.src.services.api_keys.service import (
+    consume_internal_api_key_quota,
     create_internal_api_key,
     get_internal_api_key,
     list_internal_api_keys,
@@ -51,6 +53,16 @@ def verify_key(
     db: Session = Depends(get_db),
 ) -> ApiKeyVerifyResponse:
     return ApiKeyVerifyResponse(api_key=verify_internal_api_key(db, payload.api_key, current_user))
+
+
+@router.post("/{key_id}/consume-quota", response_model=ApiKeyConsumeResponse)
+def consume_key_quota(
+    key_id: int,
+    current_user: User = Depends(require_active_user),
+    db: Session = Depends(get_db),
+) -> ApiKeyConsumeResponse:
+    api_key, remaining = consume_internal_api_key_quota(db, current_user, key_id)
+    return ApiKeyConsumeResponse(api_key=api_key, remaining=remaining)
 
 
 @router.get("/{key_id}", response_model=ApiKeyMetadataResponse)

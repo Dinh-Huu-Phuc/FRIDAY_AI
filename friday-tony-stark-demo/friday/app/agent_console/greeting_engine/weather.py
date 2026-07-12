@@ -5,9 +5,9 @@ from typing import Any, Literal
 
 WeatherMood = Literal["rainy", "hot", "cold", "pleasant", "cloudy", "unknown"]
 
-RAIN_KEYWORDS = ("mưa", "rain", "drizzle", "thunderstorm", "storm", "shower")
-CLEAR_KEYWORDS = ("trời quang", "quang", "clear", "sunny", "nắng")
-CLOUDY_KEYWORDS = ("mây", "cloud", "overcast", "u ám", "am u")
+RAIN_KEYWORDS = ("rain", "drizzle", "thunderstorm", "storm", "shower")
+CLEAR_KEYWORDS = ("clear", "sunny")
+CLOUDY_KEYWORDS = ("cloud", "overcast")
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,14 +22,11 @@ class WeatherContext:
 def _parse_temperature(value: Any) -> float | None:
     if isinstance(value, int | float):
         return float(value)
-
     if isinstance(value, str):
-        normalized = value.replace(",", ".").strip()
         try:
-            return float(normalized)
+            return float(value.replace(",", ".").strip())
         except ValueError:
             return None
-
     return None
 
 
@@ -56,23 +53,16 @@ def _resolve_weather_mood(description: str, temperature_c: float | None) -> Weat
 
 def build_weather_context(snapshot: dict[str, Any], fallback_location: str) -> WeatherContext:
     if not bool(snapshot.get("ok")):
-        return WeatherContext(
-            mood="unknown",
-            summary=None,
-            location_text=fallback_location,
-            description="thời tiết chưa rõ",
-            temperature_c=None,
-        )
+        return WeatherContext("unknown", None, fallback_location, "unknown weather", None)
 
     location_text = str(snapshot.get("location_text") or fallback_location)
-    description = str(snapshot.get("description") or "thời tiết chưa rõ")
+    description = str(snapshot.get("description") or "unknown weather")
     raw_temp = snapshot.get("temp")
     temperature_c = _parse_temperature(raw_temp)
-    temp_text = str(raw_temp if raw_temp is not None else "chưa rõ")
-
+    temp_text = str(raw_temp if raw_temp is not None else "unknown")
     return WeatherContext(
         mood=_resolve_weather_mood(description, temperature_c),
-        summary=f"Thời tiết hiện tại ở {location_text}: {description}, {temp_text} độ C.",
+        summary=f"Current weather in {location_text}: {description}, {temp_text} C.",
         location_text=location_text,
         description=description,
         temperature_c=temperature_c,
