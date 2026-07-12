@@ -17,30 +17,17 @@ class GreetingPayload:
 
 
 def build_greeting_payload(
-    *,
-    now: datetime,
-    location: RuntimeLocation,
-    weather: WeatherContext,
+    *, now: datetime, location: RuntimeLocation, weather: WeatherContext
 ) -> GreetingPayload:
     period = resolve_day_period(now.time())
-    schedule_question = get_schedule_question(period.name)
-    lifestyle_suggestion = get_lifestyle_suggestion(period.name, weather.mood)
-    meal_suggestion = get_meal_suggestion(period.name)
-
     parts = [
-        f"Chào {period.label}, sếp.",
-        f"Bây giờ là {now.hour:02d} giờ {now.minute:02d}.",
-        f"Em đang sẵn sàng đồng hành cho phiên làm việc này, với ngữ cảnh vị trí hiện tại là {location.display_name}.",
+        f"Good {period.label}, boss.",
+        f"It is {now.hour:02d}:{now.minute:02d}.",
+        f"I am ready for this session. Your current location context is {location.display_name}.",
+        weather.summary
+        or "Detailed weather is unavailable right now, so I will keep today's plan flexible.",
+        get_schedule_question(period.name),
+        get_lifestyle_suggestion(period.name, weather.mood),
+        get_meal_suggestion(period.name),
     ]
-
-    if weather.summary:
-        parts.append(weather.summary)
-    else:
-        parts.append("Em chưa lấy được thời tiết chi tiết lúc này, nên mình sẽ dùng nhịp làm việc an toàn và linh hoạt hơn.")
-
-    parts.extend([schedule_question, lifestyle_suggestion, meal_suggestion])
-
-    return GreetingPayload(
-        message=" ".join(parts),
-        weather_summary=weather.summary,
-    )
+    return GreetingPayload(message=" ".join(parts), weather_summary=weather.summary)

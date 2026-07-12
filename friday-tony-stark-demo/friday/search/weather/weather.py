@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -87,7 +88,7 @@ def _format_location(place: dict[str, Any], fallback_city: str, fallback_country
 
 def _format_number(value: Any, digits: int = 1) -> str:
     if value is None:
-        return "chưa rõ"
+        return "unknown"
     number = round(float(value), digits)
     if digits == 0 or number.is_integer():
         return str(int(number))
@@ -101,7 +102,7 @@ def _to_local_time(unix_ts: int, timezone_offset_seconds: int) -> str:
 
 def _build_forecast_summary(forecast_items: list[dict[str, Any]], timezone_offset_seconds: int) -> str:
     if not forecast_items:
-        return "Tôi chưa lấy được dữ liệu dự báo ngắn hạn."
+        return "Short-term forecast data is unavailable."
 
     snippets: list[str] = []
     for item in forecast_items[:3]:
@@ -110,15 +111,53 @@ def _build_forecast_summary(forecast_items: list[dict[str, Any]], timezone_offse
         pop = item.get("pop")
         rain_text = ""
         if pop is not None and float(pop) >= 0.2:
-            rain_text = f", khả năng mưa {round(float(pop) * 100)}%"
+            rain_text = f", {round(float(pop) * 100)}% chance of rain"
 
         snippets.append(
             f"{_to_local_time(int(item.get('dt', 0)), timezone_offset_seconds)}: "
-            f"{weather.get('description', 'thời tiết chưa rõ')}, "
-            f"{_format_number(main.get('temp'))} độ C{rain_text}"
+            f"{weather.get('description', 'unknown weather')}, "
+            f"{_format_number(main.get('temp'))} C{rain_text}"
         )
 
     return "; ".join(snippets)
+
+
+def _build_daily_forecast(
+    forecast_items: list[dict[str, Any]],
+    timezone_offset_seconds: int,
+    days_ahead: int,
+) -> dict[str, str]:
+    local_timezone = timezone(timedelta(seconds=timezone_offset_seconds))
+    target_date = datetime.now(timezone.utc).astimezone(local_timezone).date() + timedelta(days=days_ahead)
+    daily_items = [
+        item
+        for item in forecast_items
+        if datetime.fromtimestamp(int(item.get("dt", 0)), tz=local_timezone).date() == target_date
+    ]
+    if not daily_items:
+        return {}
+
+    temperatures = [
+        float((item.get("main") or {}).get("temp"))
+        for item in daily_items
+        if (item.get("main") or {}).get("temp") is not None
+    ]
+    descriptions = [
+        str((item.get("weather") or [{}])[0].get("description") or "unknown weather")
+        for item in daily_items
+    ]
+    rain_chance = max(float(item.get("pop") or 0) for item in daily_items)
+    wind_kmh = max(float((item.get("wind") or {}).get("speed") or 0) * 3.6 for item in daily_items)
+    common_description = Counter(descriptions).most_common(1)[0][0]
+
+    return {
+        "date": target_date.isoformat(),
+        "description": common_description,
+        "temp_min": _format_number(min(temperatures)) if temperatures else "unknown",
+        "temp_max": _format_number(max(temperatures)) if temperatures else "unknown",
+        "rain_chance": str(round(rain_chance * 100)),
+        "wind_kmh": _format_number(wind_kmh),
+    }
 
 
 def _format_weather_error(exc: Exception) -> str:
@@ -126,29 +165,33 @@ def _format_weather_error(exc: Exception) -> str:
     lower = message.lower()
 
     if "401" in lower or "403" in lower or "invalid api key" in lower:
-        return "Tôi chưa thể trả thời tiết vì WEATHERMAP_API_KEY hiện không hợp lệ hoặc chưa được cấp quyền."
+        return "Weather is unavailable because WEATHERMAP_API_KEY is invalid or lacks permission."
 
     if "timed out" in lower or "timeout" in lower:
-        return "Tôi chưa thể trả thời tiết vì kết nối tới dịch vụ thời tiết đang bị timeout."
+        return "The weather service connection timed out."
 
     if (
         "10013" in lower
         or "forbidden by its access permissions" in lower
         or ("socket" in lower and "forbidden" in lower)
     ):
-        return "Tôi chưa thể trả thời tiết vì tiến trình hiện tại đang bị chặn kết nối mạng ra ngoài."
+        return "Weather is unavailable because outbound network access is blocked."
 
     if (
         "getaddrinfo failed" in lower
         or "temporary failure in name resolution" in lower
         or "name or service not known" in lower
     ):
-        return "Tôi chưa thể trả thời tiết vì máy hiện tại không phân giải được DNS hoặc chưa ra internet."
+        return "Weather is unavailable because DNS resolution or internet access failed."
 
-    return f"Tôi chưa lấy được dữ liệu thời tiết lúc này: {message}"
+    return f"Weather data is unavailable right now: {message}"
 
 
-async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str, Any]:
+async def get_weather_snapshot(
+    city: str,
+    country: str = "Vietnam",
+    forecast_days_ahead: int = 0,
+) -> dict[str, Any]:
     """Fetch structured current weather and short-term forecast data."""
     city = (city or "").strip()
     country = (country or "").strip()
@@ -156,7 +199,7 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
         return {
             "ok": False,
             "location_text": "",
-            "message": "Bạn chưa cung cấp tên thành phố để tra cứu thời tiết.",
+            "message": "No city was provided for the weather lookup.",
         }
 
     api_key = _get_api_key()
@@ -164,7 +207,7 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
         return {
             "ok": False,
             "location_text": f"{city}, {country}" if country else city,
-            "message": "Thiếu WEATHERMAP_API_KEY trong tệp .env nên tôi chưa thể trả thời tiết.",
+            "message": "WEATHERMAP_API_KEY is missing from .env, so weather is unavailable.",
         }
 
     query = city if not country else f"{city},{country}"
@@ -205,7 +248,7 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
                     return {
                         "ok": False,
                         "location_text": f"{city}, {country}" if country else city,
-                        "message": f"Tôi chưa tìm thấy địa điểm '{city}' để trả thời tiết.",
+                        "message": f"I could not find '{city}' for the weather lookup.",
                     }
 
                 geocoded_place = _pick_best_location(geo_results, city=city, country=country)
@@ -219,7 +262,7 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
                             fallback_city=city,
                             fallback_country=country,
                         ),
-                        "message": f"Tôi đã tìm thấy '{city}' nhưng chưa lấy được tọa độ để trả thời tiết.",
+                        "message": f"I found '{city}', but its coordinates are unavailable.",
                     }
 
                 place = geocoded_place
@@ -231,7 +274,7 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
                     "lon": lon,
                     "appid": api_key,
                     "units": "metric",
-                    "lang": "vi",
+                    "lang": "en",
                 },
             )
             forecast_task = client.get(
@@ -241,8 +284,8 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
                     "lon": lon,
                     "appid": api_key,
                     "units": "metric",
-                    "lang": "vi",
-                    "cnt": 3,
+                    "lang": "en",
+                    "cnt": 16 if forecast_days_ahead else 3,
                 },
             )
             current_response, forecast_response = await asyncio.gather(current_task, forecast_task)
@@ -268,9 +311,34 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
     feels_like = _format_number(current_main.get("feels_like"))
     humidity = _format_number(current_main.get("humidity"), digits=0)
     wind_kmh = _format_number(float(current_wind.get("speed", 0)) * 3.6)
-    description = current_weather.get("description", "thời tiết chưa xác định")
+    description = current_weather.get("description", "unknown weather")
     forecast_items = forecast_data.get("list") or []
     forecast_summary = _build_forecast_summary(forecast_items, timezone_offset)
+    daily_forecast = (
+        _build_daily_forecast(forecast_items, timezone_offset, forecast_days_ahead)
+        if forecast_days_ahead
+        else {}
+    )
+
+    if forecast_days_ahead:
+        if not daily_forecast:
+            return {
+                "ok": False,
+                "location_text": location_text,
+                "message": f"Forecast data for the requested day is unavailable for {location_text}.",
+            }
+        return {
+            "ok": True,
+            "location_text": location_text,
+            "forecast_days_ahead": forecast_days_ahead,
+            "daily_forecast": daily_forecast,
+            "message": (
+                f"Tomorrow's forecast for {location_text}: {daily_forecast['description']}, "
+                f"{daily_forecast['temp_min']} to {daily_forecast['temp_max']} C, "
+                f"rain chance up to {daily_forecast['rain_chance']}%, and wind around "
+                f"{daily_forecast['wind_kmh']} km/h."
+            ),
+        }
 
     return {
         "ok": True,
@@ -282,9 +350,9 @@ async def get_weather_snapshot(city: str, country: str = "Vietnam") -> dict[str,
         "wind_kmh": wind_kmh,
         "forecast_summary": forecast_summary,
         "message": (
-            f"Thời tiết hiện tại ở {location_text}: {description}, {temp} độ C, "
-            f"cảm giác như {feels_like} độ C, độ ẩm {humidity}%, gió khoảng {wind_kmh} km/h. "
-            f"Dự báo 9 giờ tới: {forecast_summary}."
+            f"Current weather in {location_text}: {description}, {temp} C, "
+            f"feels like {feels_like} C, humidity {humidity}%, and wind around {wind_kmh} km/h. "
+            f"Forecast for the next nine hours: {forecast_summary}."
         ),
     }
 

@@ -8,16 +8,11 @@ from friday.about.schemas_about import AboutMatch
 
 
 SELF_INTRO_FALLBACK_TRIGGERS = (
-    "gioi thieu ban than",
-    "gioi thieu ve ban than",
-    "em la ai",
-    "ban la ai",
-    "friday la ai",
-    "lam duoc gi",
-    "co the lam gi",
     "introduce yourself",
     "who are you",
     "what can you do",
+    "tell me about yourself",
+    "tell me about friday",
 )
 
 

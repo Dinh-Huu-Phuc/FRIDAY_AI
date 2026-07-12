@@ -23,6 +23,8 @@ class User(Base):
     role_id: Mapped[int | None] = mapped_column(ForeignKey("roles.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    free_question_limit_daily: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
+    api_key_question_limit_daily: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

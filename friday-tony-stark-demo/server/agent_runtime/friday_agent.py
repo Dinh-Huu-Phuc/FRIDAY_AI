@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections import deque
 
 from friday.about import match_about_response
@@ -8,6 +9,15 @@ from friday.app import open_social_platform, resolve_social_platform
 from friday.app.computer.dependencies import get_computer_service
 from friday.app.computer.schemas.requests import RunRequest
 from friday.app.computer.schemas.responses import RunResponse
+from friday.app.computer import is_screen_understanding_request, understand_current_screen
+from friday.app.power import (
+    PowerIntent,
+    detect_power_intent,
+    get_power_state,
+    handle_power_message,
+    minimize_application_windows,
+    restore_application_windows,
+)
 from friday.app.windows_launcher.service import open_app as open_windows_app
 from friday.gmail_system_agent import check_unread_gmail_with_timeout, format_gmail_report
 from friday.messages.promt_agent_friday import build_daily_briefing_runtime_hint
@@ -81,10 +91,26 @@ class FridayAgent(Agent):
 
     async def on_enter(self) -> None:
         """Greet the user based on the machine's current local time."""
+        if get_power_state().sleeping:
+            logger.info("FRIDAY entered while sleeping; startup greeting skipped")
+            return
+        if os.getenv("FRIDAY_START_MODE", "fast").strip().lower() == "fast":
+            await self.session.say("FRIDAY is online and ready.", add_to_chat_ctx=True)
+            if os.getenv("FRIDAY_BACKGROUND_WARMUP", "true").lower() in {"1", "true", "yes", "on"}:
+                asyncio.create_task(self._deliver_startup_briefing())
+            return
         await self.session.say(
             await build_startup_greeting_message(),
             add_to_chat_ctx=True,
         )
+
+    async def _deliver_startup_briefing(self) -> None:
+        try:
+            message = await build_startup_greeting_message()
+            if not get_power_state().sleeping:
+                await self.session.say(message, add_to_chat_ctx=True)
+        except Exception as exc:
+            logger.warning("Background startup briefing failed: %s", type(exc).__name__)
 
     async def on_user_turn_completed(self, turn_ctx, new_message) -> None:
         """
@@ -98,6 +124,25 @@ class FridayAgent(Agent):
         raw_user_text = (new_message.text_content or "").strip()
         if not raw_user_text:
             return
+
+        previous_power_state = get_power_state()
+        power_intent = detect_power_intent(raw_user_text)
+        power_result = handle_power_message(
+            raw_user_text,
+            source="livekit",
+            silent_when_sleeping=True,
+        )
+        if power_result.handled:
+            logger.info("Power command handled state=%s", power_result.snapshot.state)
+            if power_intent == PowerIntent.WAKE and previous_power_state.sleeping:
+                restore_result = await asyncio.to_thread(restore_application_windows)
+                logger.info("Window restore result: %s", restore_result.message)
+            if power_result.reply:
+                await self.session.say(power_result.reply, add_to_chat_ctx=True)
+            if power_intent == PowerIntent.SLEEP and not previous_power_state.sleeping:
+                minimize_result = await asyncio.to_thread(minimize_application_windows)
+                logger.info("Window minimize result: %s", minimize_result.message)
+            raise StopResponse()
 
         refined_user_text = raw_user_text
         refiner_provider = "disabled"
@@ -128,6 +173,12 @@ class FridayAgent(Agent):
                 raw_user_text[:160],
                 refined_user_text[:160],
             )
+
+        if is_screen_understanding_request(refined_user_text):
+            logger.info("Explicit local screen understanding request detected")
+            screen_reply = await understand_current_screen(refined_user_text)
+            await self.session.say(screen_reply, add_to_chat_ctx=True)
+            raise StopResponse()
 
         social_platform: str | None = None
         social_open_result = ""
@@ -223,8 +274,8 @@ class FridayAgent(Agent):
                 news_context = (
                     "[NEWS_CONTEXT]\n"
                     "status=error\n"
-                    "fallback_user_message=Luồng tin đang chập chờn, sếp. Muốn tôi thử lại ngay không?\n"
-                    "response_rules=Trả lời ngắn gọn bằng tiếng Việt, không nói kỹ thuật nội bộ."
+                    "fallback_user_message=The news feed is unstable, boss. Would you like me to retry?\n"
+                    "response_rules=Reply briefly in English without exposing implementation details."
                 )
 
         if self._pending_user_turns is not None:

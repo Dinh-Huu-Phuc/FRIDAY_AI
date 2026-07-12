@@ -1,7 +1,0 @@
-node_modules
-.next
-.env
-.env.*
-npm-debug.log*
-tsconfig.tsbuildinfo
-.DS_Store

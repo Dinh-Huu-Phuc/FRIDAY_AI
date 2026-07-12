@@ -37,10 +37,10 @@ def example_store_conversation_without_training() -> str:
     path = store.append_raw_turn(
         session_id="session_demo_001",
         user_id="user_demo",
-        user_message="mở đèn phòng khách",
-        assistant_message="Đã rõ, tôi mở đèn phòng khách ngay.",
+        user_message="turn on the living room lights",
+        assistant_message="Certainly. I will turn on the living room lights now.",
         source="agent_runtime",
-        refined_input="Mở đèn phòng khách",
+        refined_input="Turn on the living room lights",
         metadata={"channel": "voice"},
     )
     return str(path)
@@ -83,9 +83,9 @@ def example_stt_refiner_usage() -> dict[str, Any]:
         timeout_seconds=2.0,
     )
     result = corrector.correct(
-        "fridai hôm nay thời tiết sao",
-        language="vi-VN",
-        conversation_hint="Ngữ cảnh trợ lý nhà thông minh",
+        "fridai what is the weather today",
+        language="en-US",
+        conversation_hint="Smart-home assistant context",
     )
     return {
         "raw_text": result.raw_text,
@@ -101,9 +101,9 @@ def example_stt_refiner_input_output_pairs() -> list[dict[str, str]]:
     Example: five input/output pairs expected by the STT correction module.
     """
     return [
-        {"input": "mở đèn phòng khách", "output": "Mở đèn phòng khách"},
-        {"input": "bật quạt phòng ngủ", "output": "Bật quạt phòng ngủ"},
-        {"input": "fridai hôm nay thời tiết sao", "output": "Friday, hôm nay thời tiết sao?"},
-        {"input": "gọi cho mẹ tôi", "output": "Gọi cho mẹ tôi"},
-        {"input": "tắt smart home", "output": "Tắt Smart Home"},
+        {"input": "open the living room lights", "output": "Open the living room lights"},
+        {"input": "turn on the bedroom fan", "output": "Turn on the bedroom fan"},
+        {"input": "fridai what is the weather today", "output": "Friday, what is the weather today?"},
+        {"input": "call my mother", "output": "Call my mother"},
+        {"input": "turn off smart home", "output": "Turn off Smart Home"},
     ]

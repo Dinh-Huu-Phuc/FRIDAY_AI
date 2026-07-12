@@ -14,60 +14,48 @@ from typing import Any
 DB_PATH = Path(__file__).resolve().parent / "db" / "vietnam_cities_list.json"
 
 DISPLAY_NAME_OVERRIDES = {
-    "Da Lat": "Đà Lạt",
-    "Ha Noi": "Hà Nội",
-    "Thanh pho Ho Chi Minh": "TP. Hồ Chí Minh",
-    "Can Tho": "Cần Thơ",
-    "Hue": "Huế",
-    "Vung Tau": "Vũng Tàu",
-    "Buon Ma Thuot": "Buôn Ma Thuột",
-    "Bien Hoa": "Biên Hòa",
-    "Bac Giang": "Bắc Giang",
-    "Bac Kan": "Bắc Kạn",
-    "Bac Ninh": "Bắc Ninh",
-    "Ben Tre": "Bến Tre",
-    "Ca Mau": "Cà Mau",
-    "Dien Bien Phu": "Điện Biên Phủ",
-    "Ha Tinh": "Hà Tĩnh",
-    "Quy Nhon": "Quy Nhơn",
-    "Rach Gia": "Rạch Giá",
-    "Soc Trang": "Sóc Trăng",
-    "Vinh Long": "Vĩnh Long",
-    "Vinh Yen": "Vĩnh Yên",
-    "My Tho": "Mỹ Tho",
-    "Phan Rang-Thap Cham": "Phan Rang - Tháp Chàm",
-    "Phan Thiet": "Phan Thiết",
-    "Thai Nguyen": "Thái Nguyên",
-    "Tuy Hoa": "Tuy Hòa",
+    "Da Lat": "Da Lat",
+    "Ha Noi": "Hanoi",
+    "Thanh pho Ho Chi Minh": "Ho Chi Minh City",
+    "Can Tho": "Can Tho",
+    "Hue": "Hue",
+    "Vung Tau": "Vung Tau",
+    "Buon Ma Thuot": "Buon Ma Thuot",
+    "Bien Hoa": "Bien Hoa",
+    "Bac Giang": "Bac Giang",
+    "Bac Kan": "Bac Kan",
+    "Bac Ninh": "Bac Ninh",
+    "Ben Tre": "Ben Tre",
+    "Ca Mau": "Ca Mau",
+    "Dien Bien Phu": "Dien Bien Phu",
+    "Ha Tinh": "Ha Tinh",
+    "Quy Nhon": "Quy Nhon",
+    "Rach Gia": "Rach Gia",
+    "Soc Trang": "Soc Trang",
+    "Vinh Long": "Vinh Long",
+    "Vinh Yen": "Vinh Yen",
+    "My Tho": "My Tho",
+    "Phan Rang-Thap Cham": "Phan Rang - Thap Cham",
+    "Phan Thiet": "Phan Thiet",
+    "Thai Nguyen": "Thai Nguyen",
+    "Tuy Hoa": "Tuy Hoa",
 }
 
 MANUAL_ALIASES = {
     "hanoi": "Ha Noi",
     "ha noi": "Ha Noi",
     "hn": "Ha Noi",
-    "tp ha noi": "Ha Noi",
-    "thanh pho ha noi": "Ha Noi",
     "ho chi minh": "Thanh pho Ho Chi Minh",
     "ho chi minh city": "Thanh pho Ho Chi Minh",
-    "thanh pho ho chi minh": "Thanh pho Ho Chi Minh",
-    "tphcm": "Thanh pho Ho Chi Minh",
-    "tp hcm": "Thanh pho Ho Chi Minh",
-    "tp.hcm": "Thanh pho Ho Chi Minh",
     "hcm": "Thanh pho Ho Chi Minh",
     "hcmc": "Thanh pho Ho Chi Minh",
     "sai gon": "Thanh pho Ho Chi Minh",
     "saigon": "Thanh pho Ho Chi Minh",
-    "tp sai gon": "Thanh pho Ho Chi Minh",
-    "thanh pho sai gon": "Thanh pho Ho Chi Minh",
     "da lat": "Da Lat",
     "dalat": "Da Lat",
-    "tp da lat": "Da Lat",
-    "thanh pho da lat": "Da Lat",
     "can tho": "Can Tho",
     "cantho": "Can Tho",
-    "tp can tho": "Can Tho",
     "hue": "Hue",
-    "tp hue": "Hue",
     "nha trang": "Nha Trang",
     "nhatrang": "Nha Trang",
     "vung tau": "Vung Tau",
@@ -101,26 +89,18 @@ MANUAL_ALIASES = {
 }
 
 STOP_WORDS = {
-    "thanh",
-    "pho",
-    "thanhpho",
-    "tp",
-    "tp.",
-    "tinh",
     "city",
-    "thi",
-    "xa",
     "town",
     "province",
 }
 
-LOW_PRIORITY_PREFIXES = ("ap ", "xom ")
+LOW_PRIORITY_PREFIXES: tuple[str, ...] = ()
 
 
 def _strip_accents(value: str) -> str:
     normalized = unicodedata.normalize("NFD", value or "")
     stripped = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
-    return stripped.replace("đ", "d").replace("Đ", "D")
+    return stripped
 
 
 def _normalize_text(value: str) -> str:

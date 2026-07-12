@@ -7,22 +7,23 @@ from livekit.plugins import deepgram, google as lk_google, openai as lk_openai, 
 from server.agent_runtime.bootstrap import logger
 
 
-STT_PROVIDER = "google"  # "google" | "deepgram" | "sarvam" | "whisper"
-LLM_PROVIDER = "gemini"
-TTS_PROVIDER = "openai"
+STT_PROVIDER = os.getenv("STT_PROVIDER", "sarvam").strip().lower()
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "sarvam").strip().lower()
 
 GEMINI_LLM_MODEL = "gemini-2.5-flash"
 OPENAI_LLM_MODEL = "gpt-4o"
 GOOGLE_STT_MODEL = "latest_long"
-GOOGLE_STT_LANGUAGE = "vi-VN"
+GOOGLE_STT_LANGUAGE = os.getenv("GOOGLE_STT_LANGUAGE", "en-US")
 GOOGLE_STT_SAMPLE_RATE = 16000
 
 OPENAI_TTS_MODEL = "tts-1"
 OPENAI_TTS_VOICE = "nova"  # "nova" has a clean, confident female tone
 TTS_SPEED = 1.15
 
-SARVAM_TTS_LANGUAGE = "en-IN"
-SARVAM_TTS_SPEAKER = "rahul"
+SARVAM_STT_LANGUAGE = os.getenv("SARVAM_STT_LANGUAGE", "en-IN")
+SARVAM_TTS_LANGUAGE = os.getenv("SARVAM_TTS_LANGUAGE", "en-IN")
+SARVAM_TTS_SPEAKER = os.getenv("SARVAM_TTS_SPEAKER", "priya")
 
 
 def build_stt():
@@ -41,18 +42,19 @@ def build_stt():
     if STT_PROVIDER == "sarvam":
         logger.info("STT -> Sarvam Saaras v3")
         return sarvam.STT(
-            language="unknown",
+            language=SARVAM_STT_LANGUAGE,
             model="saaras:v3",
             mode="transcribe",
             flush_signal=True,
             sample_rate=16000,
+            api_key=os.getenv("SARVAM_API_KEY") or None,
         )
     if STT_PROVIDER == "whisper":
         logger.info("STT -> OpenAI Whisper")
         return lk_openai.STT(model="whisper-1")
     if STT_PROVIDER == "deepgram":
         logger.info("STT -> Deepgram (nova-3)")
-        return deepgram.STT(model="nova-3", language="vi")
+        return deepgram.STT(model="nova-3", language="en")
     raise ValueError(f"Unknown STT_PROVIDER: {STT_PROVIDER!r}")
 
 
@@ -74,6 +76,7 @@ def build_tts():
             model="bulbul:v3",
             speaker=SARVAM_TTS_SPEAKER,
             pace=TTS_SPEED,
+            api_key=os.getenv("SARVAM_API_KEY") or None,
         )
     if TTS_PROVIDER == "openai":
         logger.info("TTS -> OpenAI TTS (%s / %s)", OPENAI_TTS_MODEL, OPENAI_TTS_VOICE)

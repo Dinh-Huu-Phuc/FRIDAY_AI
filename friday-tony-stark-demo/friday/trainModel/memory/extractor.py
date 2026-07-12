@@ -9,56 +9,46 @@ class MemoryExtractor:
     """Rule-based extractor for stable user, project, and task signals."""
 
     NAME_PATTERNS = [
-        re.compile(r"(?i)\bgoi toi la\s+([a-zA-Z0-9_ ]{2,32})"),
-        re.compile(r"(?i)\bten toi la\s+([a-zA-Z0-9_ ]{2,32})"),
+        re.compile(r"(?i)\bcall me\s+([a-zA-Z0-9_ ]{2,32})"),
+        re.compile(r"(?i)\bmy name is\s+([a-zA-Z0-9_ ]{2,32})"),
     ]
     LANGUAGE_PATTERNS = [
-        (re.compile(r"(?i)\b(tieng viet|vietnamese)\b"), "vi"),
-        (re.compile(r"(?i)\b(tieng anh|english)\b"), "en"),
+        (re.compile(r"(?i)\benglish\b"), "en"),
     ]
     RESPONSE_LENGTH_PATTERNS = [
-        (re.compile(r"(?i)\b(tra loi ngan|ngan gon)\b"), "short"),
-        (re.compile(r"(?i)\b(tra loi chi tiet|dai hon)\b"), "long"),
+        (re.compile(r"(?i)\b(short|concise) (answers?|responses?)\b"), "short"),
+        (re.compile(r"(?i)\b(detailed|longer) (answers?|responses?)\b"), "long"),
     ]
     TONE_PATTERNS = [
-        (re.compile(r"(?i)\b(trang trong|formal)\b"), "formal"),
-        (re.compile(r"(?i)\b(than thien|tu nhien|casual)\b"), "casual"),
+        (re.compile(r"(?i)\bformal\b"), "formal"),
+        (re.compile(r"(?i)\b(friendly|natural|casual)\b"), "casual"),
     ]
 
-    INTEREST_PATTERN = re.compile(r"(?i)\btoi thich\s+([^.!\n]{2,120})")
-    HABIT_PATTERN = re.compile(r"(?i)\bthuong\s+([^.!\n]{2,120})")
+    INTEREST_PATTERN = re.compile(r"(?i)\bi (?:like|am interested in)\s+([^.!\n]{2,120})")
+    HABIT_PATTERN = re.compile(r"(?i)\bi (?:usually|often)\s+([^.!\n]{2,120})")
     PROJECT_PATTERNS = [
-        re.compile(r"(?i)\bproject hien tai(?: cua toi)?(?: la| dang la|:)?\s+([^.!\n]{3,160})"),
-        re.compile(r"(?i)\brepo hien tai(?: cua toi)?(?: la| dang la|:)?\s+([^.!\n]{3,160})"),
-        re.compile(r"(?i)\btoi dang lam(?: viec)? tren\s+([^.!\n]{3,160})"),
-        re.compile(r"(?i)\btoi dang lam project\s+([^.!\n]{3,160})"),
+        re.compile(r"(?i)\bmy current (?:project|repository|repo)(?: is|:)?\s+([^.!\n]{3,160})"),
+        re.compile(r"(?i)\bi am working on\s+([^.!\n]{3,160})"),
     ]
     ACTIVE_TASK_PATTERNS = [
-        re.compile(r"(?i)\bviec dang do(?: la| gom|:)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\buu tien hom nay(?: la|:)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\bcan lam tiep(?: la|:)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\btoi dang sua\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\btoi dang them\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\btoi dang trien khai\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\bunfinished work(?: is| includes|:)?\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\btoday'?s priority(?: is|:)?\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\bi am (?:fixing|adding|implementing)\s+([^.!\n]{4,160})"),
     ]
     PAUSED_TASK_PATTERNS = [
-        re.compile(r"(?i)\btam dung\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\bde sau\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\b(?:pause|defer|leave for later)\s+([^.!\n]{4,160})"),
     ]
     BLOCKER_PATTERNS = [
-        re.compile(r"(?i)\bblocker(?: la|:)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\bmac o\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\bbi ket o\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\b(?:the )?blocker(?: is|:)?\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\bi am stuck (?:on|at)\s+([^.!\n]{4,160})"),
     ]
     NEXT_STEP_PATTERNS = [
-        re.compile(r"(?i)\bbuoc tiep theo(?: la|:)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\bnen lam tiep(?: la|:)?\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\b(?:the )?next step(?: is|:)?\s+([^.!\n]{4,160})"),
     ]
     DECISION_PATTERNS = [
-        re.compile(r"(?i)\bquyet dinh(?: la|:)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\bchot(?: la|:)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\buu tien(?: se)?\s+([^.!\n]{4,160})"),
-        re.compile(r"(?i)\bkhong can\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\b(?:the )?decision(?: is|:)?\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\bwe decided to\s+([^.!\n]{4,160})"),
+        re.compile(r"(?i)\bprioritize\s+([^.!\n]{4,160})"),
     ]
 
     def extract(self, user_message: str, assistant_message: str = "") -> ExtractedSignal:
@@ -76,7 +66,7 @@ class MemoryExtractor:
                     confidence_hits += 1
                     break
 
-        if re.search(r"(?i)\bxung ho", text):
+        if re.search(r"(?i)\baddress me as\b", text):
             signal.addressing_style = "custom"
             confidence_hits += 1
 

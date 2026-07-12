@@ -66,13 +66,13 @@ def normalize_articles(articles: list[NewsArticle], *, limit: int) -> list[NewsA
 
 def article_to_digest_line(article: NewsArticle, *, index: int) -> str:
     source = article.source_name or article.source_id or "unknown"
-    lead = article.description or "Khong co mo ta."
+    lead = article.description or "No description available."
     return f"{index}. {article.title} | Nguon: {source} | Tom tat: {lead}"
 
 
 def build_articles_digest(articles: list[NewsArticle]) -> str:
     if not articles:
-        return "Khong co bai bao phu hop."
+        return "No relevant articles are available."
     lines = [article_to_digest_line(article, index=i + 1) for i, article in enumerate(articles)]
     return "\n".join(lines)
 
@@ -90,7 +90,7 @@ def build_agent_news_context(
     digest = build_articles_digest(articles)
 
     if status != "ok":
-        safe_fallback = fallback_message or "Hien chua lay duoc luong tin phu hop."
+        safe_fallback = fallback_message or "No relevant news feed is available right now."
         return (
             "[NEWS_CONTEXT]\n"
             f"status={status}\n"
@@ -99,7 +99,7 @@ def build_agent_news_context(
             f"language={language}\n"
             "article_count=0\n"
             f"fallback_user_message={safe_fallback}\n"
-            "response_rules=Neu status khac ok thi tra loi ngan gon theo fallback_user_message, khong noi ky thuat."
+            "response_rules=When status is not ok, reply briefly in English using fallback_user_message and hide implementation details."
         )
 
     return (
@@ -109,7 +109,7 @@ def build_agent_news_context(
         f"country={country}\n"
         f"language={language}\n"
         f"article_count={len(articles)}\n"
-        "response_rules=Tom tat 3 den 5 cau ngan bang tieng Viet, phong cach Friday, khong tra raw json, khong noi ten tool.\n"
+        "response_rules=Summarize in three to five concise English sentences in FRIDAY's voice; never return raw JSON or tool names.\n"
         "articles_digest=\n"
         f"{digest}"
     )
@@ -117,9 +117,9 @@ def build_agent_news_context(
 
 def build_news_fallback_message(*, reason: str) -> str:
     if reason == "missing_api_key":
-        return "Luong tin chua duoc cau hinh day du, sep. Muon toi thu lai sau khi cap nhat key khong?"
+        return "The news feed is not fully configured, boss. Should I retry after the key is updated?"
     if reason in {"network_error", "timeout", "io_error"}:
-        return "Luong tin dang chap chon, sep. Toi thu lai ngay khi ket noi on dinh hon."
+        return "The news feed is unstable, boss. I will retry when the connection improves."
     if reason == "no_data":
-        return "Hien chua co du lieu tin phu hop voi yeu cau nay, sep."
-    return "Hien toi chua lay duoc luong tin phu hop, sep."
+        return "No news currently matches this request, boss."
+    return "I could not retrieve a relevant news feed, boss."

@@ -42,3 +42,9 @@ class ApiKeyRevokeResponse(BaseModel):
 class ApiKeyVerifyResponse(BaseModel):
     ok: bool = True
     api_key: ApiKeyMetadataResponse
+
+
+class ApiKeyConsumeResponse(BaseModel):
+    ok: bool = True
+    api_key: ApiKeyMetadataResponse
+    remaining: int | None

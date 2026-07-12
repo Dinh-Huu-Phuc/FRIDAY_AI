@@ -14,7 +14,7 @@ def register(mcp):
             parsed = json.loads(data)
             return json.dumps(parsed, indent=2)
         except json.JSONDecodeError as e:
-            return f"JSON không hợp lệ: {e}"
+            return f"Invalid JSON: {e}"
 
     @mcp.tool()
     def word_count(text: str) -> dict:

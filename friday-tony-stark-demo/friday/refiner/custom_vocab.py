@@ -12,47 +12,19 @@ class VocabularyProfile:
 
 
 def default_vocabulary_profile() -> VocabularyProfile:
-    keywords = [
-        "Friday",
-        "F.R.I.D.A.Y.",
-        "Jarvis",
-        "Tony Stark",
-        "Smart Home",
-        "phòng khách",
-        "phòng ngủ",
-        "phòng bếp",
-        "phòng tắm",
-        "nhà xe",
-        "nhiệt độ",
-        "độ ẩm",
-        "đóng cửa",
-        "mở cửa",
-        "bật đèn",
-        "tắt đèn",
-        "bật quạt",
-        "tắt quạt",
-    ]
-    alias_map = {
-        "fridai": "Friday",
-        "fri day": "Friday",
-        "f r i d a y": "Friday",
-        "gia viet": "Jarvis",
-        "giac vi": "Jarvis",
-        "smarthome": "Smart Home",
-        "smart hom": "Smart Home",
-        "smart homee": "Smart Home",
-        "toney stark": "Tony Stark",
-        "toni stark": "Tony Stark",
-        "phong nguu": "phòng ngủ",
-        "phong khac": "phòng khách",
-        "phong bepj": "phòng bếp",
-        "nhiet doo": "nhiệt độ",
-        "goi cho me toi": "Gọi cho mẹ tôi",
-        "moi den phong khach": "Mở đèn phòng khách",
-        "bat quat phong ngu": "Bật quạt phòng ngủ",
-        "tat smart hom": "Tắt Smart Home",
-    }
-    return VocabularyProfile(keywords=keywords, alias_map=alias_map)
+    return VocabularyProfile(
+        keywords=[
+            "Friday", "F.R.I.D.A.Y.", "Jarvis", "Tony Stark", "Smart Home",
+            "living room", "bedroom", "kitchen", "bathroom", "garage",
+            "temperature", "humidity", "close the door", "open the door",
+            "turn on the lights", "turn off the lights", "turn on the fan", "turn off the fan",
+        ],
+        alias_map={
+            "fridai": "Friday", "fri day": "Friday", "f r i d a y": "Friday",
+            "jar vis": "Jarvis", "smarthome": "Smart Home", "smart hom": "Smart Home",
+            "smart homee": "Smart Home", "toney stark": "Tony Stark", "toni stark": "Tony Stark",
+        },
+    )
 
 
 def merge_vocabulary(
@@ -62,51 +34,39 @@ def merge_vocabulary(
 ) -> VocabularyProfile:
     keywords = list(base.keywords)
     alias_map = dict(base.alias_map)
-
-    if extra_keywords:
-        for item in extra_keywords:
-            word = str(item).strip()
-            if word and word not in keywords:
-                keywords.append(word)
-
-    if extra_aliases:
-        for key, value in extra_aliases.items():
-            alias_key = str(key).strip().lower()
-            alias_value = str(value).strip()
-            if alias_key and alias_value:
-                alias_map[alias_key] = alias_value
-
+    for item in extra_keywords or ():
+        word = str(item).strip()
+        if word and word not in keywords:
+            keywords.append(word)
+    for key, value in (extra_aliases or {}).items():
+        alias_key = str(key).strip().lower()
+        alias_value = str(value).strip()
+        if alias_key and alias_value:
+            alias_map[alias_key] = alias_value
     return VocabularyProfile(keywords=keywords, alias_map=alias_map)
 
 
 def build_vocabulary_context_text(profile: VocabularyProfile) -> str:
-    lines = ["- keywords:"]
-    for keyword in profile.keywords:
-        lines.append(f"  - {keyword}")
-
-    lines.append("- alias_map:")
-    if profile.alias_map:
-        for wrong, correct in profile.alias_map.items():
-            lines.append(f"  - {wrong} -> {correct}")
-    else:
-        lines.append("  - none")
+    lines = ["- keywords:", *(f"  - {keyword}" for keyword in profile.keywords), "- alias_map:"]
+    lines.extend(
+        (f"  - {wrong} -> {correct}" for wrong, correct in profile.alias_map.items())
+        if profile.alias_map
+        else ("  - none",)
+    )
     return "\n".join(lines)
 
 
 def normalize_with_aliases(text: str, profile: VocabularyProfile) -> str:
     normalized = text
     for wrong, correct in profile.alias_map.items():
-        pattern = re.compile(rf"(?i)\b{re.escape(wrong)}\b")
-        normalized = pattern.sub(correct, normalized)
+        normalized = re.sub(rf"(?i)\b{re.escape(wrong)}\b", correct, normalized)
     return normalize_identifier_tokens(normalized)
 
 
 def normalize_identifier_tokens(text: str) -> str:
-    """
-    Normalize simple ID/token-like strings in transcript so downstream prompt is stable.
-    """
+    """Normalize simple ID and token-like strings for stable downstream prompts."""
     cleaned = str(text or "")
     cleaned = re.sub(r"\b([A-Za-z])\s*-\s*(\d+)\b", r"\1\2", cleaned)
-    cleaned = re.sub(r"\b(id|ma)\s*[:=]\s*([A-Za-z0-9_-]{3,})\b", r"\1 \2", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(id|code)\s*[:=]\s*([A-Za-z0-9_-]{3,})\b", r"\1 \2", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\b(token|secret|apikey)\s*[:=]\s*([A-Za-z0-9._-]{6,})\b", r"\1 \2", cleaned, flags=re.IGNORECASE)
     return cleaned
