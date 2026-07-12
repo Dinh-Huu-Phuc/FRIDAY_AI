@@ -1,271 +1,31 @@
-Bạn hãy đóng vai kiến trúc sư phần mềm Python cấp cao và viết full code production-ready cho module `trainModel` để ghép vào project trợ lý AI F.R.I.D.A.Y. hiện có.
+# FRIDAY Long-Term Learning Module Specification
 
-Mục tiêu:
-- Không train model sau mỗi lượt chat.
-- Agent chỉ học dài hạn theo lô, ví dụ theo ngày, theo số lượng mẫu đủ lớn, hoặc chạy tay.
-- Vẫn phải có memory thời gian thực để nhớ người dùng trong lúc vận hành.
-- Phải có hệ thống đánh giá model mới trước khi thay model cũ.
-- Phải có versioning để lưu model_v1, model_v2, metadata và rollback.
-- Phải có safety filter để chặn dữ liệu xấu trước khi đưa vào dataset train.
+Act as a senior Python architect. Build a production-ready `friday/trainModel/` module for controlled long-term learning.
 
-Bối cảnh project hiện tại:
-- Project Python có cấu trúc kiểu:
-  - `friday/log/...`
-  - `friday/messages/...`
-  - `friday/prompts/...`
-  - `friday/resources/...`
-  - `friday/search/...`
-  - `friday/tools/...`
-  - `friday/config.py`
-  - `main.py`
-  - `agent_friday.py`
-- Dữ liệu hội thoại của user và assistant đang hoặc sẽ được lưu log trong project.
-- Module mới cần đặt trong `friday/trainModel/`.
+## Core Rules
+- Never train after each chat turn.
+- Save eligible conversations as structured intermediate samples.
+- Runtime memory supports current reasoning only and must not update model weights.
+- Clean, redact, safety-filter, deduplicate, and score samples before curation.
+- Train only through explicit or scheduled batch jobs after minimum-data thresholds.
+- Evaluate candidate models before promotion and always support rollback.
 
-Yêu cầu kiến trúc tổng thể:
-1. Thiết kế đầy đủ cấu trúc thư mục và file cho `friday/trainModel/`.
-2. Phải bao gồm tối thiểu các phần:
-   - `collector.py`
-   - `cleaner.py`
-   - `scorer.py`
-   - `dataset_builder.py`
-   - `trainer.py`
-   - `pipeline.py`
-   - `safety_filter.py`
-   - `evaluator.py`
-   - `versioning.py`
-   - `config.py`
-   - `schemas.py`
-   - `__init__.py`
-   - thư mục `memory/`
-3. Trong `memory/` phải có thiết kế rõ ràng cho:
-   - nhớ theo session
-   - nhớ theo user
-   - nhớ preference như cách xưng hô, độ dài câu trả lời, ngôn ngữ, phong cách
-   - tách short-term memory và long-term memory
-   - có cơ chế đọc, ghi, cập nhật, hợp nhất, hết hạn dữ liệu nếu cần
-4. Có thư mục `storage/` hoặc tương đương để chứa:
-   - raw logs
-   - cleaned data
-   - datasets
-   - checkpoints
-   - model versions
-   - reports
-   - memory store
-5. Không dùng database phức tạp nếu không cần. Ưu tiên chạy được ngay bằng file JSON, JSONL, hoặc SQLite nhẹ. Nếu chọn SQLite thì phải giải thích vì sao.
-6. Code phải sạch, chia trách nhiệm rõ, dễ mở rộng, dễ đọc, có type hints, có docstring, có xử lý lỗi cơ bản.
-7. Không để placeholder kiểu `pass`, `TODO`, hoặc “tự cài sau”. Hãy viết logic chạy được ở mức khung hoàn chỉnh.
-8. Chỉ dùng Python và thư viện chuẩn nếu có thể. Nếu cần thư viện ngoài, phải hạn chế tối đa và ghi rõ trong phần ghi chú.
-9. Phải tương thích với cách tổ chức project hiện tại, không phá vỡ các module cũ.
-10. Không sửa logic chung của agent đang chạy, chỉ bổ sung module học dài hạn và memory.
+## Required Components
+- Typed conversation sample and metadata schemas.
+- JSON/JSONL or lightweight SQLite stores with atomic writes and recovery.
+- Session/user memory with expiration and merge behavior.
+- Secret and PII masking.
+- Rule-based safety and quality filters.
+- Dataset builder with versioned manifests.
+- Batch scheduler and trainer interface.
+- Evaluator, model registry, promotion policy, and rollback.
+- Structured reports and focused tests.
 
-Yêu cầu chi tiết từng phần:
+## Engineering Constraints
+- Preserve existing project behavior and module boundaries.
+- Prefer the Python standard library unless an existing dependency clearly fits.
+- Use type hints, concise docstrings, robust error handling, and deterministic behavior.
+- Never include secrets, raw credentials, or unsafe data in training output.
+- Do not use placeholders, TODOs, or incomplete methods.
 
-A. `collector.py`
-- Đọc log hội thoại từ thư mục log hiện tại của project.
-- Hỗ trợ đọc `.jsonl` hoặc `.json`.
-- Chuẩn hóa thành schema chung gồm:
-  - `session_id`
-  - `user_id` nếu có
-  - `timestamp`
-  - `user_message`
-  - `assistant_message`
-  - `feedback_score`
-  - `resolved`
-  - `metadata`
-- Bỏ qua record lỗi hoặc thiếu trường quan trọng.
-- Có hàm dump raw samples sang thư mục storage.
-
-B. `cleaner.py`
-- Chuẩn hóa text: bỏ khoảng trắng thừa, xử lý xuống dòng, làm sạch cơ bản.
-- Ẩn dữ liệu nhạy cảm cơ bản:
-  - email
-  - số điện thoại
-  - số CCCD/CMND dạng đơn giản
-  - token/secret nếu có pattern rõ
-- Có kiểm tra độ dài tối thiểu cho câu hỏi và câu trả lời.
-- Trả về sample sạch.
-
-C. `safety_filter.py`
-- Chặn dữ liệu không nên đưa vào train:
-  - câu trả lời lỗi
-  - traceback
-  - phản hồi từ chối an toàn
-  - dữ liệu chứa quá nhiều thông tin nhạy cảm
-  - nội dung độc hại rõ ràng
-  - dữ liệu rỗng, lặp vô nghĩa, spam
-- Viết rule-based rõ ràng, có thể mở rộng.
-- Trả về kết quả kiểu:
-  - safe / unsafe
-  - reason
-  - severity
-- Có thể dùng trong pipeline trước khi scorer chấm điểm.
-
-D. `scorer.py`
-- Chấm chất lượng từng sample.
-- Điểm dựa trên:
-  - độ rõ của câu hỏi
-  - độ đầy đủ của câu trả lời
-  - độ dài hợp lý
-  - feedback_score nếu có
-  - resolved nếu có
-  - phạt khi answer lỗi, lặp, vô nghĩa, generic quá mức
-- Trả điểm từ 0.0 đến 1.0.
-- Có ngưỡng keep/drop.
-
-E. `dataset_builder.py`
-- Chuyển sample đạt chuẩn thành dataset train/valid.
-- Xuất JSONL.
-- Format mẫu nên có:
-  - `system`
-  - `instruction`
-  - `output`
-- Hỗ trợ seed để chia train/valid ổn định.
-- Có thống kê số lượng kept/dropped.
-
-F. `trainer.py`
-- Không thật sự fine-tune model nếu project chưa có backend train.
-- Nhưng phải viết khung trainer hoàn chỉnh, đủ để sau này nối vào:
-  - local SFT
-  - LoRA
-  - external training service
-- Hiện tại trainer phải:
-  - nhận train/valid path
-  - tạo checkpoint folder
-  - tạo training report
-  - lưu metadata run
-- Thiết kế interface rõ ràng để thay backend sau này.
-
-G. `evaluator.py`
-- Dùng để so sánh model mới và model hiện tại trước khi promote.
-- Không cần model thật, nhưng logic evaluator phải hoàn chỉnh.
-- Có thể đánh giá dựa trên:
-  - số lượng mẫu hợp lệ
-  - điểm chất lượng trung bình
-  - rule-based score
-  - pass rate
-  - regression checks
-- Phải có kết quả kiểu:
-  - candidate_score
-  - current_score
-  - improvement
-  - promote_recommended
-  - reasons
-- Thiết kế để sau này thay bằng evaluator thật.
-
-H. `versioning.py`
-- Quản lý version model.
-- Lưu:
-  - `model_v1`, `model_v2`, ...
-  - metadata từng version
-  - ngày tạo
-  - nguồn dataset
-  - report train
-  - report evaluate
-  - trạng thái active / archived
-- Có hàm:
-  - create_new_version
-  - get_active_version
-  - list_versions
-  - promote_version
-  - rollback_version
-- Dùng file JSON hoặc SQLite nhẹ.
-- Có đảm bảo dữ liệu nhất quán ở mức cơ bản.
-
-I. `memory/`
-Hãy tạo cấu trúc con rõ ràng, ví dụ gợi ý:
-- `memory/__init__.py`
-- `memory/schemas.py`
-- `memory/store.py`
-- `memory/session_memory.py`
-- `memory/user_memory.py`
-- `memory/extractor.py`
-- `memory/manager.py`
-
-Yêu cầu logic memory:
-- Không dùng memory này để train ngay sau mỗi lượt chat.
-- Memory chỉ dùng cho inference thời gian thực.
-- Có khả năng lưu:
-  - tên gọi user muốn được gọi
-  - cách xưng hô
-  - ngôn ngữ ưa thích
-  - độ dài trả lời mong muốn
-  - chủ đề quan tâm
-  - thói quen lặp lại
-- Có short-term memory theo session.
-- Có long-term memory theo user.
-- Có extractor để rút preference từ hội thoại gần đây bằng rule-based.
-- Có manager để:
-  - load memory trước khi phản hồi
-  - update memory sau khi phản hồi
-  - hợp nhất session vào user memory khi phù hợp
-- Có file store chạy được thực tế.
-- Có cơ chế tránh lưu thông tin quá nhạy cảm.
-
-J. `pipeline.py`
-- Điều phối toàn bộ luồng:
-  - ensure dirs
-  - collect logs
-  - clean
-  - safety filter
-  - score
-  - build dataset
-  - train
-  - evaluate
-  - versioning
-- Không promote model mới nếu evaluator không đạt.
-- Trả report đầy đủ.
-- Có thể chạy bằng một hàm `run_training_pipeline()`.
-
-K. `config.py`
-- Chứa toàn bộ path và config chính:
-  - log source dir
-  - storage dirs
-  - thresholds
-  - ratios
-  - random seed
-  - evaluation thresholds
-  - memory limits
-- Có hàm tạo thư mục cần thiết.
-
-L. `schemas.py`
-- Dùng dataclass hoặc pydantic nếu thật sự cần.
-- Định nghĩa schema cho:
-  - conversation sample
-  - scored sample
-  - safety result
-  - training example
-  - training report
-  - evaluation report
-  - model version metadata
-  - memory entries
-
-Yêu cầu về output của bạn:
-1. Trước tiên, in ra cây thư mục hoàn chỉnh đề xuất cho `friday/trainModel/`.
-2. Sau đó viết full code cho từng file, theo đúng thứ tự file.
-3. Mỗi file phải có tiêu đề rõ ràng như:
-   - `# friday/trainModel/config.py`
-   - rồi tới code đầy đủ của file đó
-4. Không được bỏ sót file quan trọng nào.
-5. Phải có code chạy được ở mức khung hoàn chỉnh.
-6. Phải có ví dụ tích hợp:
-   - cách gọi `run_training_pipeline()`
-   - cách dùng memory manager trong agent loop
-7. Phải có đoạn ví dụ log input sample mà collector có thể đọc.
-8. Phải có ghi chú cuối cùng:
-   - file nào chịu trách nhiệm gì
-   - chỗ nào sau này thay backend model thật
-   - vì sao kiến trúc này an toàn hơn việc train sau mỗi lượt chat
-
-Ràng buộc quan trọng:
-- Giữ nguyên triết lý: không train model ngay sau mỗi cuộc trò chuyện.
-- Dùng memory để agent nhớ user theo thời gian thực.
-- Dùng training pipeline theo lô để học dài hạn.
-- Ưu tiên Python sạch, thực dụng, dễ ghép vào project có sẵn.
-- Không lan man giải thích lý thuyết dài dòng.
-- Tập trung viết code và kiến trúc thực tế.
-- Mọi ví dụ và comment nên rõ ràng, ngắn gọn.
-- Nếu phải chọn giữa “đẹp” và “dùng được ngay”, hãy ưu tiên “dùng được ngay”.
-
-Hãy bắt đầu ngay bằng cây thư mục đầy đủ của `friday/trainModel/`, sau đó viết toàn bộ code cho từng file.
-
+Respond in English with the complete file tree, then full runnable code for every file and a short integration example.

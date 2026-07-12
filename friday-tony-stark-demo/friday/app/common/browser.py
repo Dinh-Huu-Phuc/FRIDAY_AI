@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 import webbrowser
 
-from friday.app.common.messages import OPEN_SUCCESS_MESSAGE
+from friday.app.common.messages import OPEN_FAILED_MESSAGE, OPEN_SUCCESS_MESSAGE
 
 
 @dataclass(slots=True, frozen=True)
@@ -36,9 +36,10 @@ class BrowserManager:
         self.gateway = gateway or DefaultBrowserGateway()
 
     def open_url(self, *, platform_name: str, url: str) -> TabOpenResult:
-        self.gateway.open_new_tab(url)
+        opened = bool(self.gateway.open_new_tab(url))
         return TabOpenResult(
             platform_name=platform_name,
             url=url,
-            opened_in_new_tab=True,
+            opened_in_new_tab=opened,
+            message=OPEN_SUCCESS_MESSAGE if opened else OPEN_FAILED_MESSAGE,
         )

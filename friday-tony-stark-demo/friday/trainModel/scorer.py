@@ -20,22 +20,12 @@ class SampleScorer:
         "to",
         "is",
         "are",
-        "la",
-        "va",
-        "cho",
-        "cua",
-        "toi",
-        "ban",
-        "anh",
-        "chi",
-        "em",
     }
 
     GENERIC_PATTERNS = [
-        re.compile(r"(?i)\btoi khong biet\b"),
         re.compile(r"(?i)\bi don't know\b"),
-        re.compile(r"(?i)\bxin loi, toi khong the\b"),
-        re.compile(r"(?i)\bkhong co thong tin\b"),
+        re.compile(r"(?i)\bi do not have that information\b"),
+        re.compile(r"(?i)\bsorry, i cannot\b"),
     ]
 
     def __init__(self, config: TrainModelConfig) -> None:

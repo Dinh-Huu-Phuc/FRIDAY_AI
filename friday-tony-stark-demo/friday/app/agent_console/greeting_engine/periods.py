@@ -14,16 +14,13 @@ class DayPeriod:
 
 
 def resolve_day_period(current_time: time) -> DayPeriod:
-    hour = current_time.hour
-    minute = current_time.minute
-    total_minutes = hour * 60 + minute
-
+    total_minutes = current_time.hour * 60 + current_time.minute
     if 5 * 60 <= total_minutes <= 11 * 60 + 59:
-        return DayPeriod(name="morning", label="buổi sáng")
+        return DayPeriod(name="morning", label="morning")
     if 12 * 60 <= total_minutes <= 13 * 60 + 30:
-        return DayPeriod(name="noon", label="buổi trưa")
+        return DayPeriod(name="noon", label="afternoon")
     if 13 * 60 + 31 <= total_minutes <= 17 * 60 + 59:
-        return DayPeriod(name="afternoon", label="buổi chiều")
+        return DayPeriod(name="afternoon", label="afternoon")
     if 18 * 60 <= total_minutes <= 23 * 60 + 59:
-        return DayPeriod(name="evening", label="buổi tối")
-    return DayPeriod(name="night", label="buổi đêm")
+        return DayPeriod(name="evening", label="evening")
+    return DayPeriod(name="night", label="evening")

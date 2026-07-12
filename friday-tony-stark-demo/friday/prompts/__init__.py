@@ -18,7 +18,7 @@ def get_llm_design_principles_text() -> str:
 def build_stt_refiner_prompt(
     *,
     raw_transcript: str,
-    language: str = "vi-VN",
+    language: str = "en-US",
     conversation_hint: str = "",
     custom_vocabulary: str = "",
 ) -> str:

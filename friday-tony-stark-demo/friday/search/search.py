@@ -17,7 +17,7 @@ load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 
 def _extract_sources(response: types.GenerateContentResponse, limit: int = 5) -> List[Tuple[str, str]]:
-    """Trích xuất các nguồn web đã được kiểm chứng từ phản hồi của Gemini."""
+    """Extract grounded web sources from a Gemini response."""
     data = response.to_json_dict()
     candidates = data.get("candidates", [])
     if not candidates:
@@ -35,14 +35,14 @@ def _extract_sources(response: types.GenerateContentResponse, limit: int = 5) ->
         if not url or url in seen_urls:
             continue
         seen_urls.add(url)
-        sources.append((title or "Nguồn tham khảo", url))
+        sources.append((title or "Reference source", url))
         if len(sources) >= limit:
             break
     return sources
 
 
 def _format_search_error(exc: Exception) -> str:
-    """Convert provider/network errors into short Vietnamese diagnostics."""
+    """Convert provider and network errors into concise diagnostics."""
     message = " ".join(str(part).strip() for part in exc.args if str(part).strip()) or str(exc).strip()
     lower = message.lower()
 
@@ -52,8 +52,8 @@ def _format_search_error(exc: Exception) -> str:
         or "socket" in lower and "forbidden" in lower
     ):
         return (
-            "Tôi chưa thể tìm kiếm web vì tiến trình hiện tại đang bị chặn kết nối mạng ra ngoài. "
-            "Sếp kiểm tra giúp tôi Windows Firewall, antivirus, proxy/VPN, hoặc quyền mạng của Python/uv."
+            "Web search is blocked from making outbound connections. Check Windows Firewall, "
+            "antivirus, proxy/VPN settings, and Python or uv network permissions."
         )
 
     if (
@@ -61,7 +61,7 @@ def _format_search_error(exc: Exception) -> str:
         or "timeout" in lower
         or "deadline exceeded" in lower
     ):
-        return "Tôi chưa thể tìm kiếm web vì kết nối ra ngoài đang quá chậm hoặc bị timeout."
+        return "Web search timed out because the outbound connection is too slow."
 
     if (
         "getaddrinfo failed" in lower
@@ -69,7 +69,7 @@ def _format_search_error(exc: Exception) -> str:
         or "temporary failure in name resolution" in lower
         or "nodename nor servname provided" in lower
     ):
-        return "Tôi chưa thể tìm kiếm web vì máy hiện không phân giải được DNS hoặc chưa ra internet."
+        return "Web search is unavailable because DNS resolution or internet access failed."
 
     if (
         "api key" in lower
@@ -79,32 +79,31 @@ def _format_search_error(exc: Exception) -> str:
         or "401" in lower
         or "403" in lower
     ):
-        return "Tôi chưa thể tìm kiếm web vì khóa API hoặc quyền truy cập Google Search chưa hợp lệ."
+        return "Web search failed because the API key or Google Search permission is invalid."
 
-    return f"Tôi chưa thể tìm kiếm web lúc này: {message}"
+    return f"Web search is unavailable right now: {message}"
 
 
 def google_web_search(query: str, max_sources: int = 5) -> str:
     """
-    Tìm kiếm web bằng Gemini Google Search grounding và trả về báo cáo ngắn gọn.
-    Yêu cầu GOOGLE_API_KEY trong file .env.
+    Search the web with Gemini Google Search grounding and return a concise report.
+    Requires GOOGLE_API_KEY in .env.
     """
     query = (query or "").strip()
     if not query:
-        return "Bạn chưa cung cấp nội dung cần tìm kiếm."
+        return "No search query was provided."
 
     api_key = os.getenv("GOOGLE_API_KEY", "").strip()
     if not api_key:
-        return "Thiếu GOOGLE_API_KEY trong tệp .env nên tôi chưa thể tìm kiếm web."
+        return "GOOGLE_API_KEY is missing from .env, so web search is unavailable."
 
     model = os.getenv("GOOGLE_SEARCH_MODEL", "gemini-2.0-flash").strip() or "gemini-2.0-flash"
     client = genai.Client(api_key=api_key)
 
     prompt = (
-        "Bạn là trợ lý tìm kiếm web thông minh. "
-        "Hãy trả lời bằng tiếng Việt, ngắn gọn, trung thực, không biết thì nói không biết. "
-        "Tóm tắt kết quả tìm kiếm cho truy vấn sau trong khoảng 4-8 câu.\n\n"
-        f"Truy vấn: {query}"
+        "You are a careful web research assistant. Reply in concise, honest English and state "
+        "when information is unknown. Summarize the following query in four to eight sentences.\n\n"
+        f"Query: {query}"
     )
 
     try:
@@ -121,13 +120,13 @@ def google_web_search(query: str, max_sources: int = 5) -> str:
 
     summary = (response.text or "").strip()
     if not summary:
-        summary = "Tôi đã tìm kiếm xong nhưng chưa trích xuất được tóm tắt rõ ràng."
+        summary = "The search completed, but no clear summary could be extracted."
 
     sources = _extract_sources(response, limit=max_sources)
     if not sources:
         return summary
 
-    lines = [summary, "", "### Nguồn tham khảo:"]
+    lines = [summary, "", "### Sources:"]
     for idx, (title, url) in enumerate(sources, 1):
         lines.append(f"{idx}. {title} - {url}")
     return "\n".join(lines)

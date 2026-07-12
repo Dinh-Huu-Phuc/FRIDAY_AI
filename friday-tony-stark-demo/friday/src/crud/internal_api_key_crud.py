@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from friday.src.models.internal_api_key import InternalApiKey
@@ -45,6 +45,14 @@ def list_api_keys(db: Session, *, owner_user_id: int | None = None, limit: int =
     if owner_user_id is not None:
         statement = statement.where(InternalApiKey.owner_user_id == owner_user_id)
     return list(db.execute(statement).scalars().all())
+
+
+def count_api_keys_created_since(db: Session, *, owner_user_id: int, since: datetime) -> int:
+    statement = select(func.count()).select_from(InternalApiKey).where(
+        InternalApiKey.owner_user_id == owner_user_id,
+        InternalApiKey.created_at >= since,
+    )
+    return int(db.execute(statement).scalar_one())
 
 
 def get_api_key(db: Session, key_id: int) -> InternalApiKey | None:

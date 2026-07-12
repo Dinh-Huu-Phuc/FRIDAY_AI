@@ -85,7 +85,7 @@ def _call_openai_compatible_chat(
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "Bạn là bộ sửa transcript STT."},
+            {"role": "system", "content": "You correct English STT transcripts without answering them."},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0,
@@ -142,7 +142,7 @@ class STTCorrector:
         self,
         raw_transcript: str,
         *,
-        language: str = "vi-VN",
+        language: str = "en-US",
         conversation_hint: str = "",
         extra_keywords: list[str] | None = None,
         extra_aliases: dict[str, str] | None = None,
@@ -278,23 +278,19 @@ class STTCorrector:
         lines = [line.strip("-* \t") for line in content.splitlines() if line.strip()]
         content = lines[0] if lines else ""
         content = re.sub(r'^["\']+|["\']+$', "", content).strip()
-        content = re.sub(r"(?i)^(cau dung la|ban nen noi|transcript|output)\s*[:：-]\s*", "", content).strip()
+        content = re.sub(r"(?i)^(corrected sentence|transcript|output)\s*[:：-]\s*", "", content).strip()
         content = re.sub(r"\s+", " ", content).strip()
         return content
 
     def _rule_based_refine(self, text: str) -> str:
         """
-        Minimal deterministic cleanup for short Vietnamese command-like utterances.
+        Minimal deterministic cleanup for short English command-like utterances.
         """
         refined = str(text or "").strip()
         if not refined:
             return ""
 
         replacements = {
-            r"(?i)\bmở\b": "Mở",
-            r"(?i)\bgọi\b": "Gọi",
-            r"(?i)\bbật\b": "Bật",
-            r"(?i)\btắt\b": "Tắt",
             r"(?i)\bfriday\b": "Friday",
         }
         for pattern, value in replacements.items():
@@ -306,7 +302,7 @@ class STTCorrector:
         if refined:
             refined = refined[0].upper() + refined[1:]
 
-        question_words = ("sao", "khong", "nao", "bao nhieu", "may gio", "the nao")
+        question_words = ("what", "when", "where", "why", "who", "how", "can", "could", "would", "is", "are")
         lower_refined = refined.lower()
         ends_with_punctuation = bool(re.search(r"[.!?]$", refined))
         if not ends_with_punctuation and any(word in lower_refined for word in question_words):
@@ -317,23 +313,23 @@ class STTCorrector:
         sample = str(text or "").strip().lower()
         if not sample:
             return True
-        return sample.startswith("xin chào") or sample.startswith("tôi là") or sample.startswith("chắc chắn")
+        return sample.startswith("hello") or sample.startswith("i am") or sample.startswith("certainly")
 
     @staticmethod
     def usage_example() -> str:
         return (
             "from friday.refiner import STTCorrector\n\n"
             "corrector = STTCorrector(enabled=True, provider_name='groq', groq_api_key='...')\n"
-            "result = corrector.correct('fridai hôm nay thời tiết sao', language='vi-VN')\n"
+            "result = corrector.correct('fridai what is the weather today', language='en-US')\n"
             "print(result.refined_text)"
         )
 
     @staticmethod
     def sample_input_output_examples() -> list[tuple[str, str]]:
         return [
-            ("mở đèn phòng khách", "Mở đèn phòng khách"),
-            ("bật quạt phòng ngủ", "Bật quạt phòng ngủ"),
-            ("fridai hôm nay thời tiết sao", "Friday, hôm nay thời tiết sao?"),
-            ("gọi cho mẹ tôi", "Gọi cho mẹ tôi"),
-            ("tắt smart home", "Tắt Smart Home"),
+            ("open the living room lights", "Open the living room lights"),
+            ("turn on the bedroom fan", "Turn on the bedroom fan"),
+            ("fridai what is the weather today", "Friday, what is the weather today?"),
+            ("call my mother", "Call my mother"),
+            ("turn off smart home", "Turn off Smart Home"),
         ]

@@ -56,7 +56,7 @@ async def agent_tts(payload: AgentTtsRequest) -> Response:
 async def agent_stt(
     request: Request,
     content_type: str = Header(default="audio/webm"),
-    x_stt_language: str = Header(default="vi"),
+    x_stt_language: str = Header(default="en"),
 ) -> dict:
     try:
         result = await transcribe_core_audio(

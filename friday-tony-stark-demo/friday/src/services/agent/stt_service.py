@@ -74,19 +74,15 @@ def _build_corrector() -> STTCorrector:
 
 def _apply_intent_aliases(text: str) -> str:
     normalized = " ".join(str(text or "").strip().split())
-    lower = normalized.lower()
-    aliases = {
-        "doc sach": "đọc sách",
-        "đọc sạch": "đọc sách",
-    }
-    return aliases.get(lower, normalized)
+    aliases = {"firday": "FRIDAY", "fridai": "FRIDAY"}
+    return aliases.get(normalized.lower(), normalized)
 
 
 async def transcribe_core_audio(
     audio_bytes: bytes,
     *,
     content_type: str,
-    language: str = "vi",
+    language: str = "en",
 ) -> SpeechTranscriptionResult:
     if not audio_bytes:
         raise SpeechTranscriptionError("Audio payload is empty.")
@@ -128,20 +124,19 @@ async def transcribe_core_audio(
 
     correction = _build_corrector().correct(
         raw_text,
-        language="vi-VN" if language.lower().startswith("vi") else language,
-        conversation_hint="Core AI dashboard voice command. Prefer short Vietnamese command/query intent.",
+        language="en-US",
+        conversation_hint="Core AI dashboard voice command. Prefer a concise English command or query.",
         extra_keywords=[
-            "tin tức ngày hôm nay",
-            "tin tức Việt Nam",
-            "tin tức thế giới",
-            "thời tiết Đà Lạt",
-            "quan sát màn hình",
+            "today's news",
+            "news in Vietnam",
+            "world news",
+            "weather in Da Lat",
+            "observe the screen",
             "daily briefing",
         ],
         extra_aliases={
-            "tin tuc ngay hom nay": "tin tức ngày hôm nay",
-            "tin tuc hom nay": "tin tức hôm nay",
-            "thoi tiet da lat": "thời tiết Đà Lạt",
+            "firday": "FRIDAY",
+            "fridai": "FRIDAY",
         },
     )
 

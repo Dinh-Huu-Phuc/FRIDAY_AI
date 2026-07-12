@@ -6,7 +6,7 @@ from functools import lru_cache
 from friday.googleServiceCloud.credentials import ensure_google_application_credentials
 from livekit.plugins import deepgram, google as lk_google, openai as lk_openai, sarvam
 
-DEFAULT_TTS_PROVIDER = os.getenv("PAGECLIENT_TTS_PROVIDER", os.getenv("TTS_PROVIDER", "openai")).strip().lower()
+DEFAULT_TTS_PROVIDER = os.getenv("PAGECLIENT_TTS_PROVIDER", os.getenv("TTS_PROVIDER", "sarvam")).strip().lower()
 DEFAULT_TTS_SPEED = float(os.getenv("PAGECLIENT_TTS_SPEED", os.getenv("TTS_SPEED", "1.15")))
 
 
@@ -31,8 +31,8 @@ def _build_tts(provider: str):
     if selected == "google":
         credentials_file = ensure_google_application_credentials()
         return lk_google.TTS(
-            language=os.getenv("GOOGLE_TTS_LANGUAGE", "vi-VN"),
-            voice_name=os.getenv("GOOGLE_TTS_VOICE_NAME", "vi-VN-Wavenet-A"),
+            language=os.getenv("GOOGLE_TTS_LANGUAGE", "en-US"),
+            voice_name=os.getenv("GOOGLE_TTS_VOICE_NAME", "en-US-Wavenet-F"),
             sample_rate=int(os.getenv("GOOGLE_TTS_SAMPLE_RATE", "24000")),
             speaking_rate=float(os.getenv("GOOGLE_TTS_SPEAKING_RATE", str(DEFAULT_TTS_SPEED))),
             credentials_file=credentials_file,
@@ -40,9 +40,9 @@ def _build_tts(provider: str):
 
     if selected == "sarvam":
         return sarvam.TTS(
-            target_language_code=os.getenv("SARVAM_TTS_LANGUAGE", "vi-IN"),
+            target_language_code=os.getenv("SARVAM_TTS_LANGUAGE", "en-IN"),
             model=os.getenv("SARVAM_TTS_MODEL", "bulbul:v3"),
-            speaker=os.getenv("SARVAM_TTS_SPEAKER", "anushka"),
+            speaker=os.getenv("SARVAM_TTS_SPEAKER", "priya"),
             pace=DEFAULT_TTS_SPEED,
             api_key=os.getenv("SARVAM_API_KEY") or None,
         )

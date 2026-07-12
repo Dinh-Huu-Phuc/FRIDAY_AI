@@ -7,9 +7,8 @@ def register(mcp):
     @mcp.tool()
     async def check_unread_gmail_messages(include_locally_reported: bool = False) -> str:
         """
-        Kiểm tra Gmail chưa đọc của người dùng bằng Gmail API readonly, lưu log local,
-        rồi báo cáo lại nội dung chính. Dùng khi người dùng yêu cầu check Gmail,
-        đọc email, kiểm tra email chưa đọc, hoặc báo cáo inbox.
+        Check unread Gmail through the read-only Gmail API, save a local log,
+        and report the important content. Use for inbox, unread mail, or email reports.
         """
 
         result = await check_unread_gmail_with_timeout(

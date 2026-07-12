@@ -23,6 +23,8 @@ class UserResponse(BaseModel):
     role_id: int | None = None
     is_active: bool
     is_verified: bool
+    free_question_limit_daily: int = 10
+    api_key_question_limit_daily: int = 10
     last_login_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

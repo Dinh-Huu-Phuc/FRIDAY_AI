@@ -7,7 +7,7 @@ from .world import WorldNewsService, detect_news_scope, looks_like_world_news_re
 
 
 class NewsService:
-    """Lớp điều phối tin tức giữa nguồn Việt Nam và nguồn thế giới."""
+    """Coordinate domestic and world news sources."""
 
     def __init__(
         self,

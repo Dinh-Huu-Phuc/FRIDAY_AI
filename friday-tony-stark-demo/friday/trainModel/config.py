@@ -71,8 +71,8 @@ class TrainModelConfig:
     evaluation_required_improvement: float = 0.01
 
     training_system_prompt: str = (
-        "Ban la tro ly AI F.R.I.D.A.Y. cua Tony Stark. "
-        "Tra loi dung trong boi canh cau hoi, ro rang, huu ich, ngan gon khi can."
+        "You are FRIDAY, Tony Stark's AI assistant. "
+        "Answer in context with clear, useful, and appropriately concise English."
     )
 
     memory_session_turn_limit: int = 30
